@@ -5,7 +5,7 @@ import { Router } from "express";
 import { eq } from "drizzle-orm";
 import { v7 as uuidv7 } from "uuid";
 import { z } from "zod";
-import { gameDetails, searchGames } from "../bgg.js";
+import { BggAuthError, bggIsConfigured, gameDetails, searchGames } from "../bgg.js";
 import { db } from "../db/client.js";
 import { game } from "../db/schema.js";
 import { env } from "../env.js";
@@ -21,6 +21,11 @@ const searchSchema = z.object({
   q: z.string().trim().min(2, { error: "Skriv mindst to tegn." }).max(100),
 });
 
+// Frontenden bruger den til at afgøre om søgefeltet overhovedet skal vises.
+gamesRouter.get("/bgg-status", (_req, res) => {
+  res.json({ configured: bggIsConfigured() });
+});
+
 gamesRouter.get("/search", async (req, res, next) => {
   try {
     const { q } = parseOrThrow(searchSchema, req.query);
@@ -28,6 +33,12 @@ gamesRouter.get("/search", async (req, res, next) => {
   } catch (error) {
     if (error instanceof HttpError) {
       next(error);
+      return;
+    }
+    if (error instanceof BggAuthError) {
+      // Ikke en 503: ingen ventetid løser det, og "prøv igen om lidt" ville
+      // sende brugeren i den forkerte retning.
+      next(new HttpError(501, error.message));
       return;
     }
     // BGG er ustabilt. UI'et falder tilbage på manuel oprettelse, så det er
@@ -104,6 +115,6 @@ gamesRouter.post("/import", async (req, res, next) => {
 
     res.status(201).json({ game: row, alreadyExisted: false });
   } catch (error) {
-    next(error);
+    next(error instanceof BggAuthError ? new HttpError(501, error.message) : error);
   }
 });

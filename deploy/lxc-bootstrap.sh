@@ -61,6 +61,9 @@ UPLOADS_DIR=/var/lib/spil/uploads
 BETTER_AUTH_SECRET=${SECRET}
 PUBLIC_URL=${PUBLIC_URL}
 TRUSTED_ORIGINS=${PUBLIC_URL}
+# BoardGameGeek kræver et registreret API-token. Uden det virker resten af
+# appen fint — spil oprettes bare manuelt. Se deploy/README.md.
+#BGG_TOKEN=
 EOF
   chmod 0600 /etc/spil/spil.env
   echo "    /etc/spil/spil.env oprettet for ${PUBLIC_URL}"

@@ -57,6 +57,31 @@ Bagefter:
 2. Opret en proxy-host i nginxproxymanager (CT 104) mod containerens IP, port 80.
 3. Åbn appen. Første besøg viser opsætningssiden, hvor du opretter administratoren.
 
+## BoardGameGeek-token
+
+BGG lukkede XML API'et bag registrering og bearer-tokens i efteråret 2025. Uden token svarer de
+401 på alt — også det gamle v1-API. Appen virker fint uden: søgefeltet skjuler sig selv, og spil
+oprettes manuelt.
+
+Vil du have opslag, så registrér en applikation på <https://boardgamegeek.com/using_the_xml_api>
+og læg tokenet ind:
+
+```bash
+ssh root@$NODE 'pct exec 117 -- bash -c "
+  sed -i \"s|^#\\?BGG_TOKEN=.*|BGG_TOKEN=DIT_TOKEN|\" /etc/spil/spil.env
+  systemctl restart spil-api
+"'
+```
+
+Verificér bagefter at det blev taget i brug:
+
+```bash
+ssh root@$NODE 'pct exec 117 -- curl -s http://127.0.0.1/api/games/bgg-status'
+```
+
+Afviser BGG tokenet, svarer `/api/games/search` 501 med deres egen begrundelse i beskeden — ikke
+503, for ingen ventetid løser et forkert token.
+
 ## Opdatering
 
 ```bash

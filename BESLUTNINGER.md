@@ -133,6 +133,22 @@ under skrivning kan give en inkonsistent kopi.
 
 ---
 
+### BoardGameGeek kræver nu et token
+
+*Opdaget 2026-07-27, efter at appen var deployet.*
+
+BGG lukkede XML API'et bag registrering og bearer-tokens i efteråret 2025. Både v1 og v2 svarer
+401 uden `Authorization: Bearer <token>`. Planen gik ud fra et åbent API — det holder ikke længere.
+
+Tokenet er gjort **valgfrit** (`BGG_TOKEN`). Er det ikke sat, skjuler søgefeltet sig selv, og spil
+oprettes manuelt. Et opslagsværktøj må ikke kunne gøre resten af biblioteket ubrugeligt.
+
+Manglende eller afvist token giver **501**, ikke 503. 503 betyder "prøv igen om lidt", og det ville
+sende brugeren i den forkerte retning: ingen ventetid løser et manglende token. Ved 401/403 fra BGG
+sendes deres egen svartekst med, så man kan se forskel på udløbet, forkert og uregistreret token.
+
+Cachen bruges også når tokenet mangler, så allerede hentede søgninger stadig virker.
+
 ### Fotos går uden om outboxen
 
 En `photo`-række skal have en rigtig serversti i `file_path`, og den findes først efter uploaden.

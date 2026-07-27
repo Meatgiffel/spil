@@ -22,6 +22,11 @@ const envSchema = z
     // Den udadvendte adresse appen ses på. Bruges til cookies og redirects.
     PUBLIC_URL: z.url().default("http://localhost:5173"),
     TRUSTED_ORIGINS: csv.default([]),
+    // BoardGameGeek lukkede XML API'et bag registrering og bearer-tokens i
+    // efteråret 2025. Uden token svarer de 401 på alt — også det gamle v1-API.
+    // Tokenet er valgfrit: er det ikke sat, virker resten af appen, og spil
+    // oprettes manuelt.
+    BGG_TOKEN: z.string().min(1).optional(),
   })
   .superRefine((value, ctx) => {
     // Indkob falder tilbage til AllowAnyOrigin når CORS-konfigurationen mangler.

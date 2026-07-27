@@ -18,7 +18,16 @@ export function BggSearch() {
   const [state, setState] = useState<"idle" | "searching" | "error">("idle");
   const [message, setMessage] = useState<string | null>(null);
   const [importing, setImporting] = useState<number | null>(null);
+  const [configured, setConfigured] = useState<boolean | null>(null);
   const debounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    // BGG kræver et API-token siden efteråret 2025. Er der ikke sat et, er der
+    // ingen grund til at vise et søgefelt der aldrig kan give et resultat.
+    void api<{ configured: boolean }>("/api/games/bgg-status")
+      .then((body) => setConfigured(body.configured))
+      .catch(() => setConfigured(null));
+  }, []);
 
   useEffect(() => {
     if (debounce.current) clearTimeout(debounce.current);
@@ -69,6 +78,15 @@ export function BggSearch() {
     } finally {
       setImporting(null);
     }
+  }
+
+  if (configured === false) {
+    return (
+      <p className="lede">
+        BoardGameGeek-opslag er ikke sat op på denne server — der mangler et
+        API-token. Opret spil manuelt i stedet.
+      </p>
+    );
   }
 
   return (
