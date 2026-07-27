@@ -3,9 +3,8 @@
 Selvhostet app til at holde styr på hvilke brætspil man har spillet med sine venner.
 Offline-first PWA, hostet i en LXC på Proxmox-clusteret "Asgard".
 
-**Status: appen er bygget og testet lokalt. Deployment er ikke lavet.** Alt under `deploy/`,
-`scripts/release.sh` og GitHub Actions mangler stadig — se `PLAN.md` trin 9. Mappen er heller ikke
-et git-repo endnu.
+**Status: appen er bygget og testet lokalt, og deploy-filerne er skrevet.** Det der mangler er at
+oprette LXC'en og GitHub-repoet — se `deploy/README.md`.
 
 | Fil | Indhold |
 |---|---|
@@ -13,6 +12,7 @@ et git-repo endnu.
 | `DESIGN-BRIEF.md` | Selvstændig brief til Claude Design |
 | `DESIGN-IMPORT.md` | Importinstruktion til Claude Design-projektet, plus filliste |
 | `BESLUTNINGER.md` | Trufne valg med begrundelser, plus åbne punkter. **Hold den opdateret** |
+| `deploy/README.md` | Runbook: containerens spec, bootstrap, opdatering, rollback |
 
 ---
 
