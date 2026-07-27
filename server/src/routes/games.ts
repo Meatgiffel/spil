@@ -99,6 +99,8 @@ gamesRouter.post("/import", async (req, res, next) => {
     const row = {
       id: existing?.id ?? uuidv7(),
       title: details.title,
+      defaultOutcomeType: existing?.defaultOutcomeType ?? null,
+      lowScoreWins: existing?.lowScoreWins ?? false,
       bggId: details.bggId,
       year: details.year,
       minPlayers: details.minPlayers,

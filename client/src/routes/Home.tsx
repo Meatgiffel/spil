@@ -58,12 +58,7 @@ export function HomeScreen() {
                 <span className="card-title">{play.gameTitle}</span>
                 <span className="row">
                   <span className="lede grow">
-                    {play.coopResult === "won" && "Alle vandt"}
-                    {play.coopResult === "lost" && "Alle tabte"}
-                    {play.coopResult === null &&
-                      (play.winners.length > 0
-                        ? `${play.winners.join(" og ")} vandt`
-                        : "Ingen vinder noteret")}
+                    {play.summary}
                     {play.participantCount > 0 &&
                       ` · ${plural(play.participantCount, "spiller", "spillere")}`}
                     {formatDuration(play.durationMinutes) &&

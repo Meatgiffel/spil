@@ -39,9 +39,24 @@ export const groupMemberSchema = z.object({
   role: z.enum(["owner", "member"]).default("member"),
 });
 
+/**
+ * Hvordan et parti afgøres.
+ *
+ * Typen huskes pr. spil, så man vælger den én gang og aldrig igen. "Afbrudt"
+ * er bevidst *ikke* med her — et parti kan afbrydes uanset type, så det er et
+ * selvstændigt flag.
+ */
+export const OUTCOME_TYPES = ["ranking", "score", "coop", "teams", "solo"] as const;
+export type OutcomeType = (typeof OUTCOME_TYPES)[number];
+export const outcomeTypeSchema = z.enum(OUTCOME_TYPES);
+
 export const gameSchema = z.object({
   id: idSchema,
   title: trimmedText(200, "Spiltitlen"),
+  // Huskes fra sidste parti, så registreringen ikke skal spørge hver gang.
+  defaultOutcomeType: outcomeTypeSchema.nullable().default(null),
+  // 6 nimmt!, golf og andre hvor færrest point vinder.
+  lowScoreWins: z.boolean().default(false),
   bggId: optionalInt(1, 100_000_000),
   year: optionalInt(-4000, 2200),
   minPlayers: optionalInt(1, 99),
@@ -57,17 +72,32 @@ export const playSchema = z.object({
   location: optionalText(120),
   durationMinutes: optionalInt(0, 60 * 24 * 7),
   notes: optionalText(4000),
-  // Sat for co-op-spil, hvor holdet samlet vinder eller taber. Ellers null.
+  outcomeType: outcomeTypeSchema.default("ranking"),
+  // Sat for samarbejds- og solospil, hvor der ikke er placeringer. Ellers null.
   coopResult: z.enum(["won", "lost"]).nullable().default(null),
+  // Ved holdspil: navnet på det hold der vandt. Dækker også forrædere og
+  // én-mod-alle, hvor "holdet" bare er den side man var på.
+  winningTeam: optionalText(40),
+  // Hvor langt nåede I — "Boss 4", "Mission 23". Fri tekst, fordi hvert spil
+  // har sit eget begreb for det.
+  milestone: optionalText(60),
+  // Hvor tæt det var. Sekunder, så både "7 sek." og "4 min." kan rummes.
+  timeRemainingSeconds: optionalInt(0, 60 * 60 * 24),
+  difficulty: optionalText(40),
+  // Partiet blev ikke spillet færdigt. Så er der ingen vinder, uanset type.
+  abandoned: z.boolean().default(false),
 });
 
 export const playParticipantSchema = z.object({
   id: idSchema,
   playId: idSchema,
   playerId: idSchema,
-  // 1 = vinder. Samme tal på flere deltagere betyder uafgjort. Null ved co-op.
+  // 1 = vinder. Samme tal på flere deltagere betyder uafgjort. Null ved
+  // samarbejde, hold og solo.
   placement: optionalInt(1, 99),
-  // Point registreres ikke i UI'et — feltet findes så det kan tilføjes uden en migration.
+  // Holdnavn eller side. Ved holdspil afgør det sammen med play.winningTeam
+  // hvem der vandt.
+  team: optionalText(40),
   score: optionalInt(-1_000_000, 1_000_000),
 });
 

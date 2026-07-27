@@ -212,6 +212,10 @@ export const game = sqliteTable(
   {
     id: text("id").primaryKey(),
     title: text("title").notNull(),
+    // Huskes fra sidste parti, så registreringen ikke skal spørge hver gang.
+    defaultOutcomeType: text("default_outcome_type"),
+    // 6 nimmt!, golf og andre hvor færrest point vinder.
+    lowScoreWins: integer("low_score_wins", { mode: "boolean" }).notNull().default(false),
     bggId: integer("bgg_id"),
     year: integer("year"),
     minPlayers: integer("min_players"),
@@ -236,8 +240,19 @@ export const play = sqliteTable(
     location: text("location"),
     durationMinutes: integer("duration_minutes"),
     notes: text("notes"),
-    // Sat for co-op-spil hvor holdet samlet vinder eller taber.
+    // ranking | score | coop | teams | solo
+    outcomeType: text("outcome_type").notNull().default("ranking"),
+    // Sat for samarbejds- og solospil hvor der ikke er placeringer.
     coopResult: text("coop_result"),
+    // Holdet der vandt. Dækker også forrædere og én-mod-alle, hvor "holdet"
+    // bare er den side man var på.
+    winningTeam: text("winning_team"),
+    // Hvor langt nåede I — "Boss 4", "Mission 23".
+    milestone: text("milestone"),
+    timeRemainingSeconds: integer("time_remaining_seconds"),
+    difficulty: text("difficulty"),
+    // Partiet blev ikke spillet færdigt. Så er der ingen vinder, uanset type.
+    abandoned: integer("abandoned", { mode: "boolean" }).notNull().default(false),
     ...syncColumns,
   },
   (table) => [
@@ -257,10 +272,11 @@ export const playParticipant = sqliteTable(
     playerId: text("player_id")
       .notNull()
       .references(() => player.id, { onDelete: "cascade" }),
-    // 1 = vinder. Samme tal på flere deltagere betyder uafgjort. Null ved co-op.
+    // 1 = vinder. Samme tal på flere deltagere betyder uafgjort. Null ved
+    // samarbejde, hold og solo.
     placement: integer("placement"),
-    // Point registreres ikke i UI'et. Kolonnen findes så det kan tilføjes senere
-    // uden en migration — se BESLUTNINGER.md.
+    // Holdnavn eller side.
+    team: text("team"),
     score: integer("score"),
     ...syncColumns,
   },

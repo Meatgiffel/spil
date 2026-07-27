@@ -1,20 +1,22 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { useNavigate, useParams } from "react-router";
 import { v7 as uuidv7 } from "uuid";
+import { OUTCOME_TYPES, type OutcomeType } from "@spil/shared";
 import { Avatar, Empty, Field, ScreenHead } from "../components.js";
 import { mutate, type LocalPlayer } from "../db/local.js";
 import { listGames, listGroupPlayers, listGroups } from "../db/queries.js";
 import { sync } from "../db/sync.js";
 import { plural } from "../format.js";
+import { OUTCOME_HINTS, OUTCOME_LABELS, placementsFromScores } from "../outcome.js";
 import { useUser } from "../session.js";
 
-type Step = "gruppe" | "spil" | "hvem" | "placeringer" | "detaljer";
+type Step = "gruppe" | "spil" | "hvem" | "resultat" | "detaljer";
 
-const FLOW: Step[] = ["spil", "hvem", "placeringer", "detaljer"];
+const FLOW: Step[] = ["spil", "hvem", "resultat", "detaljer"];
 
-/** Placering pr. spiller. null = ikke placeret endnu. */
-type Ranking = Map<string, number>;
+/** Standardnavne på hold. Kan overskrives, men dækker de fleste tilfælde. */
+const DEFAULT_TEAMS = ["Hold 1", "Hold 2"];
 
 export function NewPlayScreen() {
   const user = useUser();
@@ -29,9 +31,19 @@ export function NewPlayScreen() {
   const [gameFilter, setGameFilter] = useState("");
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [ranking, setRanking] = useState<Ranking>(new Map());
+  const [outcomeType, setOutcomeType] = useState<OutcomeType>("ranking");
+  const [ranking, setRanking] = useState<Map<string, number>>(new Map());
   const [tieMode, setTieMode] = useState(false);
-  const [coop, setCoop] = useState<null | "won" | "lost">(null);
+  const [scores, setScores] = useState<Map<string, string>>(new Map());
+  const [lowScoreWins, setLowScoreWins] = useState(false);
+  const [teams, setTeams] = useState<Map<string, string>>(new Map());
+  const [winningTeam, setWinningTeam] = useState<string | null>(null);
+  const [coop, setCoop] = useState<"won" | "lost" | null>(null);
+  const [abandoned, setAbandoned] = useState(false);
+
+  const [milestone, setMilestone] = useState("");
+  const [timeRemaining, setTimeRemaining] = useState("");
+  const [difficulty, setDifficulty] = useState("");
 
   const [playedAt, setPlayedAt] = useState(() => {
     const now = new Date();
@@ -50,6 +62,20 @@ export function NewPlayScreen() {
     [groupId],
   );
 
+  const chosenGame = useMemo(
+    () => (games ?? []).find((game) => game.id === gameId),
+    [games, gameId],
+  );
+
+  // Spillet husker sin udfaldstype, så man kun vælger den første gang.
+  useEffect(() => {
+    if (!chosenGame) return;
+    if (chosenGame.defaultOutcomeType) {
+      setOutcomeType(chosenGame.defaultOutcomeType as OutcomeType);
+    }
+    setLowScoreWins(chosenGame.lowScoreWins);
+  }, [chosenGame]);
+
   const chosenPlayers = useMemo(
     () => (players ?? []).filter((player) => selected.has(player.id)),
     [players, selected],
@@ -60,8 +86,6 @@ export function NewPlayScreen() {
     if (!needle) return games ?? [];
     return (games ?? []).filter((game) => game.title.toLowerCase().includes(needle));
   }, [games, gameFilter]);
-
-  const stepIndex = FLOW.indexOf(step);
 
   function togglePlayer(playerId: string) {
     setSelected((previous) => {
@@ -88,7 +112,6 @@ export function NewPlayScreen() {
     setRanking((current) => {
       const next = new Map(current);
       if (next.has(playerId)) {
-        // Tryk igen fjerner placeringen og lukker hullet.
         const removed = next.get(playerId)!;
         next.delete(playerId);
         for (const [id, place] of next) {
@@ -103,8 +126,36 @@ export function NewPlayScreen() {
     });
   }
 
-  function reset() {
-    setRanking(new Map());
+  function cycleTeam(playerId: string) {
+    setTeams((current) => {
+      const next = new Map(current);
+      const names = teamNames();
+      const now = next.get(playerId);
+      const index = now === undefined ? -1 : names.indexOf(now);
+      next.set(playerId, names[(index + 1) % names.length]!);
+      return next;
+    });
+  }
+
+  function teamNames(): string[] {
+    const used = [...new Set([...teams.values()])].filter(Boolean);
+    return used.length >= 2 ? used : DEFAULT_TEAMS;
+  }
+
+  /** Er resultat-trinnet udfyldt nok til at gå videre? */
+  function resultatKlar(): boolean {
+    if (abandoned) return true;
+    switch (outcomeType) {
+      case "ranking":
+        return ranking.size > 0;
+      case "score":
+        return [...scores.values()].some((value) => value.trim() !== "");
+      case "coop":
+      case "solo":
+        return coop !== null;
+      case "teams":
+        return winningTeam !== null && teams.size > 0;
+    }
   }
 
   async function save() {
@@ -119,6 +170,8 @@ export function NewPlayScreen() {
           {
             id: finalGameId,
             title: newGameTitle.trim(),
+            defaultOutcomeType: outcomeType,
+            lowScoreWins,
             bggId: null,
             year: null,
             minPlayers: null,
@@ -127,11 +180,24 @@ export function NewPlayScreen() {
           },
           user,
         );
+      } else if (chosenGame) {
+        // Husk valget til næste gang spillet registreres.
+        if (
+          chosenGame.defaultOutcomeType !== outcomeType ||
+          chosenGame.lowScoreWins !== lowScoreWins
+        ) {
+          await mutate(
+            "game",
+            { ...chosenGame, defaultOutcomeType: outcomeType, lowScoreWins },
+            user,
+          );
+        }
       }
       if (!finalGameId) return;
 
       const playId = uuidv7();
       const minutes = Number.parseInt(duration, 10);
+      const seconds = Number.parseInt(timeRemaining, 10);
 
       await mutate(
         "play",
@@ -143,20 +209,49 @@ export function NewPlayScreen() {
           location: location.trim() || null,
           durationMinutes: Number.isFinite(minutes) && minutes > 0 ? minutes : null,
           notes: notes.trim() || null,
-          coopResult: coop,
+          outcomeType,
+          coopResult:
+            abandoned || (outcomeType !== "coop" && outcomeType !== "solo") ? null : coop,
+          winningTeam: abandoned || outcomeType !== "teams" ? null : winningTeam,
+          milestone: milestone.trim() || null,
+          timeRemainingSeconds: Number.isFinite(seconds) && seconds >= 0 ? seconds : null,
+          difficulty: difficulty.trim() || null,
+          abandoned,
         },
         user,
       );
 
+      // Placeringer regnes ud af point, så statistikken kun har ét felt at se på.
+      const numericScores = new Map(
+        chosenPlayers.map((player) => {
+          const raw = scores.get(player.id)?.trim() ?? "";
+          const value = Number.parseInt(raw, 10);
+          return [player.id, raw !== "" && Number.isFinite(value) ? value : null];
+        }),
+      );
+      const derived =
+        outcomeType === "score"
+          ? placementsFromScores(numericScores, lowScoreWins)
+          : new Map<string, number | null>();
+
       for (const player of chosenPlayers) {
+        const placement = abandoned
+          ? null
+          : outcomeType === "ranking"
+            ? (ranking.get(player.id) ?? null)
+            : outcomeType === "score"
+              ? (derived.get(player.id) ?? null)
+              : null;
+
         await mutate(
           "playParticipant",
           {
             id: uuidv7(),
             playId,
             playerId: player.id,
-            placement: coop ? null : (ranking.get(player.id) ?? null),
-            score: null,
+            placement,
+            team: outcomeType === "teams" ? (teams.get(player.id) ?? null) : null,
+            score: outcomeType === "score" ? numericScores.get(player.id) : null,
           },
           user,
         );
@@ -238,7 +333,11 @@ export function NewPlayScreen() {
                 }}
               >
                 <span className="name">{game.title}</span>
-                {game.year && <span className="kicker">{game.year}</span>}
+                {game.defaultOutcomeType && (
+                  <span className="kicker">
+                    {OUTCOME_LABELS[game.defaultOutcomeType as OutcomeType]}
+                  </span>
+                )}
               </button>
             ))}
           </div>
@@ -286,11 +385,7 @@ export function NewPlayScreen() {
                   aria-pressed={on}
                   onClick={() => togglePlayer(player.id)}
                 >
-                  <Avatar
-                    name={player.name}
-                    guest={player.userId === null}
-                    onAccent={on}
-                  />
+                  <Avatar name={player.name} guest={player.userId === null} onAccent={on} />
                   <span className="name">{player.name}</span>
                   {on && <span className="kicker">MED</span>}
                 </button>
@@ -303,7 +398,7 @@ export function NewPlayScreen() {
             className="btn btn-primary btn-block"
             type="button"
             disabled={selected.size === 0}
-            onClick={() => setStep("placeringer")}
+            onClick={() => setStep("resultat")}
           >
             Videre · {plural(selected.size, "spiller", "spillere")}
           </button>
@@ -312,9 +407,9 @@ export function NewPlayScreen() {
     );
   }
 
-  // ── Placeringer ─────────────────────────────────────────────────────────
+  // ── Resultat ────────────────────────────────────────────────────────────
 
-  if (step === "placeringer") {
+  if (step === "resultat") {
     const ranked = chosenPlayers
       .filter((player) => ranking.has(player.id))
       .sort((a, b) => ranking.get(a.id)! - ranking.get(b.id)!);
@@ -324,140 +419,273 @@ export function NewPlayScreen() {
     return (
       <main className="screen">
         <ScreenHead
-          title="Placeringer"
+          title="Resultat"
           back={() => setStep("hvem")}
           right={`3 / ${FLOW.length}`}
           steps={{ total: FLOW.length, current: 3 }}
         />
 
         <div className="screen-body">
-          <div className="seg" role="group" aria-label="Type parti">
-            <button
-              className="seg-opt"
-              type="button"
-              aria-pressed={coop === null}
-              onClick={() => setCoop(null)}
-            >
-              Placeringer
-            </button>
-            <button
-              className="seg-opt"
-              type="button"
-              aria-pressed={coop !== null}
-              onClick={() => setCoop("won")}
-            >
-              Co-op
-            </button>
+          <div className="stack-tight">
+            <span className="kicker">Sådan afgøres spillet</span>
+            <div className="seg" role="group" aria-label="Type resultat">
+              {OUTCOME_TYPES.map((type) => (
+                <button
+                  key={type}
+                  className="seg-opt"
+                  type="button"
+                  aria-pressed={outcomeType === type}
+                  onClick={() => setOutcomeType(type)}
+                >
+                  {OUTCOME_LABELS[type]}
+                </button>
+              ))}
+            </div>
+            <span className="lede">{OUTCOME_HINTS[outcomeType]}</span>
           </div>
 
-          {coop === null ? (
+          {abandoned ? (
+            <div className="empty">
+              <h3>Partiet blev afbrudt</h3>
+              <p className="lede">
+                Det bliver gemt uden vinder og tæller ikke med i sejrsstatistikken.
+              </p>
+            </div>
+          ) : (
             <>
-              <div>
-                <h2>Tryk i den rækkefølge de endte</h2>
-                <p className="lede">
-                  Først vinderen. Slå <b>Uafgjort</b> til og tryk to navne lige efter
-                  hinanden for delt placering.
-                </p>
-              </div>
-
-              <div className="stack-tight">
-                {ranked.map((player) => {
-                  const place = ranking.get(player.id)!;
-                  const winner = place === best;
-                  return (
-                    <button
-                      key={player.id}
-                      className={winner ? "list-row list-row-active" : "list-row"}
-                      type="button"
-                      onClick={() => rank(player.id)}
-                    >
-                      <span className="rank">{place}.</span>
-                      <Avatar
-                        name={player.name}
-                        guest={player.userId === null}
-                        onAccent={winner}
-                      />
-                      <span className={winner ? "name name-winner" : "name"}>
-                        {player.name}
-                      </span>
-                      <span className="kicker">{winner ? "VINDER" : "×"}</span>
-                    </button>
-                  );
-                })}
-
-                {unranked.length > 0 && (
-                  <>
-                    <hr className="rule" />
-                    <span className="kicker">Mangler placering</span>
-                    {unranked.map((player) => (
+              {outcomeType === "ranking" && (
+                <div className="stack-tight">
+                  {ranked.map((player) => {
+                    const place = ranking.get(player.id)!;
+                    const winner = place === best;
+                    return (
                       <button
                         key={player.id}
-                        className="list-row list-row-muted"
+                        className={winner ? "list-row list-row-active" : "list-row"}
                         type="button"
                         onClick={() => rank(player.id)}
                       >
-                        <span className="rank rank-empty">–</span>
-                        <Avatar name={player.name} guest={player.userId === null} />
-                        <span className="name muted">{player.name}</span>
-                        <span className="kicker" style={{ color: "var(--accent)" }}>
-                          TRYK
+                        <span className="rank">{place}.</span>
+                        <Avatar
+                          name={player.name}
+                          guest={player.userId === null}
+                          onAccent={winner}
+                        />
+                        <span className={winner ? "name name-winner" : "name"}>
+                          {player.name}
                         </span>
+                        <span className="kicker">{winner ? "VINDER" : "×"}</span>
+                      </button>
+                    );
+                  })}
+
+                  {unranked.length > 0 && (
+                    <>
+                      <hr className="rule" />
+                      <span className="kicker">Mangler placering</span>
+                      {unranked.map((player) => (
+                        <button
+                          key={player.id}
+                          className="list-row list-row-muted"
+                          type="button"
+                          onClick={() => rank(player.id)}
+                        >
+                          <span className="rank rank-empty">–</span>
+                          <Avatar name={player.name} guest={player.userId === null} />
+                          <span className="name muted">{player.name}</span>
+                          <span className="kicker" style={{ color: "var(--accent)" }}>
+                            TRYK
+                          </span>
+                        </button>
+                      ))}
+                    </>
+                  )}
+                </div>
+              )}
+
+              {outcomeType === "score" && (
+                <div className="stack-tight">
+                  {chosenPlayers.map((player) => (
+                    <div key={player.id} className="list-row">
+                      <Avatar name={player.name} guest={player.userId === null} />
+                      <span className="name">{player.name}</span>
+                      <input
+                        className="input"
+                        style={{ width: 96, minHeight: 44 }}
+                        type="number"
+                        inputMode="numeric"
+                        aria-label={`Point til ${player.name}`}
+                        value={scores.get(player.id) ?? ""}
+                        onChange={(event) =>
+                          setScores((current) =>
+                            new Map(current).set(player.id, event.target.value),
+                          )
+                        }
+                      />
+                    </div>
+                  ))}
+                  <button
+                    className="btn btn-secondary"
+                    type="button"
+                    aria-pressed={lowScoreWins}
+                    style={
+                      lowScoreWins
+                        ? { background: "var(--accent)", color: "var(--accent-ink)" }
+                        : undefined
+                    }
+                    onClick={() => setLowScoreWins((value) => !value)}
+                  >
+                    {lowScoreWins ? "Færrest point vinder" : "Flest point vinder"}
+                  </button>
+                </div>
+              )}
+
+              {(outcomeType === "coop" || outcomeType === "solo") && (
+                <div className="stack">
+                  <div className="seg" role="group" aria-label="Resultat">
+                    <button
+                      className="seg-opt"
+                      type="button"
+                      aria-pressed={coop === "won"}
+                      onClick={() => setCoop("won")}
+                    >
+                      {outcomeType === "solo" ? "Jeg vandt" : "Vi vandt"}
+                    </button>
+                    <button
+                      className="seg-opt"
+                      type="button"
+                      aria-pressed={coop === "lost"}
+                      onClick={() => setCoop("lost")}
+                    >
+                      {outcomeType === "solo" ? "Jeg tabte" : "Vi tabte"}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {outcomeType === "teams" && (
+                <div className="stack">
+                  <span className="lede">Tryk på en spiller for at skifte hold.</span>
+                  <div className="stack-tight">
+                    {chosenPlayers.map((player) => {
+                      const team = teams.get(player.id);
+                      const winner = team !== undefined && team === winningTeam;
+                      return (
+                        <button
+                          key={player.id}
+                          className={winner ? "list-row list-row-active" : "list-row"}
+                          type="button"
+                          onClick={() => cycleTeam(player.id)}
+                        >
+                          <Avatar
+                            name={player.name}
+                            guest={player.userId === null}
+                            onAccent={winner}
+                          />
+                          <span className="name">{player.name}</span>
+                          <span className="kicker">{team ?? "VÆLG HOLD"}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <hr className="rule" />
+                  <span className="kicker">Hvilket hold vandt?</span>
+                  <div className="seg" role="group" aria-label="Vindende hold">
+                    {teamNames().map((name) => (
+                      <button
+                        key={name}
+                        className="seg-opt"
+                        type="button"
+                        aria-pressed={winningTeam === name}
+                        onClick={() => setWinningTeam(name)}
+                      >
+                        {name}
                       </button>
                     ))}
-                  </>
-                )}
-              </div>
-            </>
-          ) : (
-            <>
-              <h2>Hvordan gik det?</h2>
-              <div className="seg" role="group" aria-label="Resultat">
-                <button
-                  className="seg-opt"
-                  type="button"
-                  aria-pressed={coop === "won"}
-                  onClick={() => setCoop("won")}
-                >
-                  Vi vandt
-                </button>
-                <button
-                  className="seg-opt"
-                  type="button"
-                  aria-pressed={coop === "lost"}
-                  onClick={() => setCoop("lost")}
-                >
-                  Vi tabte
-                </button>
-              </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Milepæl og resttid giver kun mening når man kan tabe undervejs. */}
+              {(outcomeType === "coop" || outcomeType === "solo") && (
+                <>
+                  <hr className="rule" />
+                  <Field
+                    label="Hvor langt nåede I? (valgfrit)"
+                    hint="Fx “Boss 4” eller “Mission 23”."
+                  >
+                    <input
+                      className="input"
+                      value={milestone}
+                      maxLength={60}
+                      onChange={(event) => setMilestone(event.target.value)}
+                    />
+                  </Field>
+                  <Field label="Sekunder tilbage (valgfrit)">
+                    <input
+                      className="input"
+                      type="number"
+                      inputMode="numeric"
+                      min={0}
+                      value={timeRemaining}
+                      onChange={(event) => setTimeRemaining(event.target.value)}
+                    />
+                  </Field>
+                  <Field label="Sværhedsgrad (valgfrit)">
+                    <input
+                      className="input"
+                      value={difficulty}
+                      maxLength={40}
+                      placeholder="Fx “Heroic”"
+                      onChange={(event) => setDifficulty(event.target.value)}
+                    />
+                  </Field>
+                </>
+              )}
             </>
           )}
         </div>
 
         <div className="screen-foot">
-          {coop === null && (
-            <div className="row">
-              <button
-                className="btn btn-secondary grow"
-                type="button"
-                aria-pressed={tieMode}
-                style={
-                  tieMode
-                    ? { background: "var(--accent)", color: "var(--accent-ink)" }
-                    : undefined
-                }
-                onClick={() => setTieMode((value) => !value)}
-              >
-                Uafgjort {tieMode ? "til" : "fra"}
-              </button>
-              <button className="btn btn-secondary" type="button" onClick={reset}>
-                Ryd
-              </button>
-            </div>
-          )}
+          <div className="row">
+            {outcomeType === "ranking" && !abandoned && (
+              <>
+                <button
+                  className="btn btn-secondary grow"
+                  type="button"
+                  aria-pressed={tieMode}
+                  style={
+                    tieMode
+                      ? { background: "var(--accent)", color: "var(--accent-ink)" }
+                      : undefined
+                  }
+                  onClick={() => setTieMode((value) => !value)}
+                >
+                  Uafgjort {tieMode ? "til" : "fra"}
+                </button>
+                <button
+                  className="btn btn-secondary"
+                  type="button"
+                  onClick={() => setRanking(new Map())}
+                >
+                  Ryd
+                </button>
+              </>
+            )}
+            <button
+              className={abandoned ? "btn btn-primary grow" : "btn btn-secondary grow"}
+              type="button"
+              aria-pressed={abandoned}
+              onClick={() => setAbandoned((value) => !value)}
+            >
+              {abandoned ? "Afbrudt ✓" : "Vi spillede ikke færdig"}
+            </button>
+          </div>
           <button
             className="btn btn-primary btn-block"
             type="button"
-            disabled={coop === null && ranking.size === 0}
+            disabled={!resultatKlar()}
             onClick={() => setStep("detaljer")}
           >
             Videre
@@ -473,7 +701,7 @@ export function NewPlayScreen() {
     <main className="screen">
       <ScreenHead
         title="Detaljer"
-        back={() => setStep("placeringer")}
+        back={() => setStep("resultat")}
         right={`4 / ${FLOW.length}`}
         steps={{ total: FLOW.length, current: 4 }}
       />

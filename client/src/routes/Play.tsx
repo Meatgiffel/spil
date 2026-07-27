@@ -12,6 +12,12 @@ import {
 } from "../db/queries.js";
 import { sync } from "../db/sync.js";
 import { formatDate, formatDuration, formatTime } from "../format.js";
+import {
+  OUTCOME_LABELS,
+  bestPlacement,
+  formatSeconds,
+  isWinner,
+} from "../outcome.js";
 import { useUser } from "../session.js";
 
 export function PlayScreen() {
@@ -65,15 +71,7 @@ export function PlayScreen() {
   }
 
   const { play, game, group, participants } = data;
-  const best = participants.reduce<number | null>(
-    (lowest, row) =>
-      row.placement === null
-        ? lowest
-        : lowest === null
-          ? row.placement
-          : Math.min(lowest, row.placement),
-    null,
-  );
+  const best = bestPlacement(participants);
   const duration = formatDuration(play.durationMinutes);
 
   return (
@@ -92,26 +90,73 @@ export function PlayScreen() {
           {play.pending && <PendingMark />}
         </div>
 
-        {play.coopResult && (
+        {play.abandoned && (
+          <div className="banner">
+            <span className="grow">Partiet blev ikke spillet færdigt.</span>
+          </div>
+        )}
+
+        {!play.abandoned && play.coopResult && (
           <div className={play.coopResult === "won" ? "banner banner-accent" : "banner"}>
             <span className="grow">
-              {play.coopResult === "won" ? "Holdet vandt." : "Holdet tabte."}
+              {play.outcomeType === "solo"
+                ? play.coopResult === "won"
+                  ? "Vundet."
+                  : "Tabt."
+                : play.coopResult === "won"
+                  ? "Holdet vandt."
+                  : "Holdet tabte."}
             </span>
           </div>
         )}
 
+        {!play.abandoned && play.outcomeType === "teams" && play.winningTeam && (
+          <div className="banner banner-accent">
+            <span className="grow">{play.winningTeam} vandt.</span>
+          </div>
+        )}
+
+        {(play.milestone || play.timeRemainingSeconds !== null || play.difficulty) && (
+          <section className="stack-tight">
+            <h2>Hvor langt nåede I</h2>
+            <div className="card card-flat">
+              {play.milestone && (
+                <div className="spread">
+                  <span className="muted">Nåede til</span>
+                  <span className="name">{play.milestone}</span>
+                </div>
+              )}
+              {play.timeRemainingSeconds !== null && (
+                <div className="spread">
+                  <span className="muted">Tid tilbage</span>
+                  <span className="name">{formatSeconds(play.timeRemainingSeconds)}</span>
+                </div>
+              )}
+              {play.difficulty && (
+                <div className="spread">
+                  <span className="muted">Sværhedsgrad</span>
+                  <span className="name">{play.difficulty}</span>
+                </div>
+              )}
+            </div>
+          </section>
+        )}
+
         <section className="stack-tight">
-          <h2>Deltagere</h2>
+          <div className="spread">
+            <h2>Deltagere</h2>
+            <span className="kicker">{OUTCOME_LABELS[play.outcomeType]}</span>
+          </div>
           {participants.map((row) => {
-            const winner = row.placement !== null && row.placement === best;
+            const winner = isWinner(play, row, best);
             return (
               <div
                 key={row.id}
                 className={winner ? "list-row list-row-active" : "list-row"}
               >
-                <span className="rank">
-                  {row.placement === null ? "–" : `${row.placement}.`}
-                </span>
+                {row.placement !== null && (
+                  <span className="rank">{row.placement}.</span>
+                )}
                 <Avatar
                   name={row.player?.name ?? "?"}
                   guest={row.player?.userId === null}
@@ -120,6 +165,8 @@ export function PlayScreen() {
                 <span className={winner ? "name name-winner" : "name"}>
                   {row.player?.name ?? "Ukendt"}
                 </span>
+                {row.team && <span className="tag tag-outline">{row.team}</span>}
+                {row.score !== null && <span className="kicker">{row.score} p.</span>}
                 {winner && <span className="kicker">VINDER</span>}
               </div>
             );

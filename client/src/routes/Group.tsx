@@ -175,8 +175,7 @@ export function GroupScreen() {
                   <span className="stack-tight grow">
                     <span className="name">{play.gameTitle}</span>
                     <span className="kicker">
-                      {formatDay(play.playedAt)}
-                      {play.winners.length > 0 && ` · ${play.winners.join(" og ")} vandt`}
+                      {formatDay(play.playedAt)} · {play.summary}
                     </span>
                   </span>
                   {play.pending && <PendingMark />}

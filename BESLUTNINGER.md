@@ -25,14 +25,39 @@ BGG bruges til at slå titel, årstal, cover og spillerantal op. Efter import er
 app'en afhænger aldrig af BGG igen. Manuel oprettelse er altid mulig — BGG er langsom, rate-limiter
 aggressivt og mangler nogle titler.
 
-### Parti-data: placeringer, ikke point
+### Parti-data: fem udfaldstyper
 
-Der registreres vinder og rækkefølge (1., 2., 3. …), med uafgjort tilladt, samt co-op hvor holdet
-samlet vinder eller taber. Derudover dato, sted, varighed, noter og billeder.
+*Udvidet 2026-07-27. Oprindeligt kun placeringer og co-op; point var bevidst fravalgt.*
 
-**Point pr. spiller er bevidst fravalgt.** Kolonnen `play_participant.score` oprettes alligevel som
-nullable, fordi den koster ingenting i skemaet og gør det til en ren frontend-opgave at tilføje
-point senere. Byg ikke UI til den nu.
+Et parti har en `outcomeType`, og den afgør både registreringen og hvem der har vundet:
+
+| Type | Afgøres af | Eksempler |
+|---|---|---|
+| `ranking` | Placeringer, uafgjort tilladt | Ticket to Ride, Carcassonne |
+| `score` | Point. Placeringer regnes ud automatisk | Wingspan, 6 nimmt! |
+| `coop` | Holdet vinder eller taber samlet | Pandemic, 5 Minute Dungeon |
+| `teams` | Hold mod hold — dækker også forrædere og én-mod-alle | Codenames, Secret Hitler, Scotland Yard |
+| `solo` | Ét menneske mod spillet | Spirit Island solo |
+
+Dertil et `abandoned`-flag, som er **uafhængigt** af typen: et parti kan afbrydes uanset hvordan
+det ellers ville være afgjort, og så er der ingen vinder. Havde afbrudt været en sjette type,
+kunne man ikke registrere et afbrudt holdspil som holdspil.
+
+Typen **huskes pr. spil** (`game.default_outcome_type`), så man vælger den én gang. Det samme
+gælder `low_score_wins` for spil hvor færrest point vinder.
+
+Til samarbejds- og solospil er der tre valgfrie felter til *hvor langt I nåede*: `milestone`
+(fritekst — "Boss 4", "Mission 23"), `time_remaining_seconds` og `difficulty`. Fritekst frem for
+en talværdi, fordi hvert spil har sit eget begreb for hvor langt man er nået.
+
+Fravalgt: felter defineret pr. spil. Det ville give pænere statistik, men kræver en editor til
+feltdefinitioner og gør den første registrering af hvert spil omstændelig.
+
+**Vinderreglen findes ét sted**, `client/src/outcome.ts`. Den bruges af feed, partidetalje og
+statistik — ligger den tre steder, begynder de tre at være uenige.
+
+Kampagne og legacy (Gloomhaven, Pandemic Legacy) er stadig ikke dækket. Det kræver en
+kampagne-enhed med sin egen historik og er et projekt for sig.
 
 ### Auth: Better Auth
 

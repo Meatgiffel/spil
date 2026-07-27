@@ -226,6 +226,8 @@ const configs: Record<SyncTable, TableConfig> = {
       const row = {
         id,
         title: payload.title as string,
+        defaultOutcomeType: (payload.defaultOutcomeType as string | null) ?? null,
+        lowScoreWins: Boolean(payload.lowScoreWins),
         bggId: (payload.bggId as number | null) ?? null,
         year: (payload.year as number | null) ?? null,
         minPlayers: (payload.minPlayers as number | null) ?? null,
@@ -259,7 +261,13 @@ const configs: Record<SyncTable, TableConfig> = {
         location: (payload.location as string | null) ?? null,
         durationMinutes: (payload.durationMinutes as number | null) ?? null,
         notes: (payload.notes as string | null) ?? null,
+        outcomeType: (payload.outcomeType as string) ?? "ranking",
         coopResult: (payload.coopResult as string | null) ?? null,
+        winningTeam: (payload.winningTeam as string | null) ?? null,
+        milestone: (payload.milestone as string | null) ?? null,
+        timeRemainingSeconds: (payload.timeRemainingSeconds as number | null) ?? null,
+        difficulty: (payload.difficulty as string | null) ?? null,
+        abandoned: Boolean(payload.abandoned),
         ...meta,
       };
       db.insert(play).values(row).onConflictDoUpdate({ target: play.id, set: row }).run();
@@ -297,6 +305,7 @@ const configs: Record<SyncTable, TableConfig> = {
         playId: payload.playId as string,
         playerId: payload.playerId as string,
         placement: (payload.placement as number | null) ?? null,
+        team: (payload.team as string | null) ?? null,
         score: (payload.score as number | null) ?? null,
         ...meta,
       };

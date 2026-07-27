@@ -284,6 +284,66 @@ describe("sync", () => {
     );
   });
 
+  it("bevarer udfaldstype, hold og milepæl gennem sync", async () => {
+    // De felter går gennem både zod-skemaet og en håndskrevet kolonnemapning.
+    // Går én af dem i stykker, tabes resultatet i stilhed.
+    const coopId = uuidv7();
+    const body = await push(anna.cookie, [
+      upsert("play", {
+        id: coopId,
+        groupId,
+        gameId,
+        playedAt: t0,
+        outcomeType: "coop",
+        coopResult: "lost",
+        milestone: "Boss 4",
+        timeRemainingSeconds: 7,
+        difficulty: "Heroic",
+        abandoned: false,
+      }, t0 + 500),
+      upsert("playParticipant", {
+        id: uuidv7(),
+        playId: coopId,
+        playerId: anna.playerId,
+        placement: null,
+        team: "Hold 2",
+        score: 42,
+      }, t0 + 500),
+    ]);
+    assert.deepEqual(statuses(body), ["applied", "applied"]);
+
+    const efter = await pull(bo.cookie);
+    const parti = efter.changes.play.find((row) => row.id === coopId);
+    assert.equal(parti?.outcomeType, "coop");
+    assert.equal(parti?.coopResult, "lost");
+    assert.equal(parti?.milestone, "Boss 4");
+    assert.equal(parti?.timeRemainingSeconds, 7);
+    assert.equal(parti?.difficulty, "Heroic");
+    assert.equal(parti?.abandoned, false);
+
+    const deltager = efter.changes.playParticipant.find((row) => row.playId === coopId);
+    assert.equal(deltager?.team, "Hold 2");
+    assert.equal(deltager?.score, 42);
+  });
+
+  it("bevarer spillets huskede udfaldstype", async () => {
+    const body = await push(anna.cookie, [
+      upsert("game", {
+        id: gameId,
+        title: "Vingespil",
+        year: 2019,
+        defaultOutcomeType: "score",
+        lowScoreWins: true,
+      }, t0 + 600),
+    ]);
+    assert.deepEqual(statuses(body), ["applied"]);
+
+    const efter = await pull(anna.cookie);
+    const spil = efter.changes.game.find((row) => row.id === gameId);
+    assert.equal(spil?.defaultOutcomeType, "score");
+    assert.equal(spil?.lowScoreWins, true);
+  });
+
   it("lader afviste mutationer stå alene uden at vælte resten af batchen", async () => {
     const okId = uuidv7();
     const body = await push(anna.cookie, [

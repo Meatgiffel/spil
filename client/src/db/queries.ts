@@ -1,5 +1,6 @@
 import { db, type LocalPlay, type LocalPlayer } from "./local.js";
 import { byName } from "../format.js";
+import { bestPlacement, isWinner, outcomeSummary } from "../outcome.js";
 
 /**
  * Alle forespørgsler filtrerer soft-slettede rækker fra. Rækkerne bliver
@@ -97,6 +98,8 @@ export type PlaySummary = LocalPlay & {
   gameTitle: string;
   groupName: string;
   winners: string[];
+  /** Færdig linje til feeds — "Ida vandt · Boss 4 · 7 sek. tilbage". */
+  summary: string;
   participantCount: number;
 };
 
@@ -127,23 +130,17 @@ export async function summarisePlays(plays: LocalPlay[]): Promise<PlaySummary[]>
 
   return plays.map((play) => {
     const mine = participants.filter((row) => row.playId === play.id);
-    const best = mine.reduce<number | null>(
-      (lowest, row) =>
-        row.placement === null ? lowest : lowest === null ? row.placement : Math.min(lowest, row.placement),
-      null,
-    );
-    const winners =
-      best === null
-        ? []
-        : mine
-            .filter((row) => row.placement === best)
-            .map((row) => playerNames.get(row.playerId) ?? "Ukendt");
+    const best = bestPlacement(mine);
+    const winners = mine
+      .filter((row) => isWinner(play, row, best))
+      .map((row) => playerNames.get(row.playerId) ?? "Ukendt");
 
     return {
       ...play,
       gameTitle: gameTitles.get(play.gameId) ?? "Ukendt spil",
       groupName: groupNames.get(play.groupId) ?? "Ukendt gruppe",
       winners,
+      summary: outcomeSummary(play, winners),
       participantCount: mine.length,
     };
   });
@@ -166,22 +163,23 @@ export async function groupStats(groupId: string): Promise<{
     await db.playParticipant.where("playId").anyOf(plays.map((play) => play.id)).toArray(),
   );
 
-  const bestByPlay = new Map<string, number>();
-  for (const row of participants) {
-    if (row.placement === null) continue;
-    const current = bestByPlay.get(row.playId);
-    if (current === undefined || row.placement < current) {
-      bestByPlay.set(row.playId, row.placement);
-    }
+  const playById = new Map(plays.map((play) => [play.id, play]));
+  const bestByPlay = new Map<string, number | null>();
+  for (const play of plays) {
+    bestByPlay.set(
+      play.id,
+      bestPlacement(participants.filter((row) => row.playId === play.id)),
+    );
   }
 
   const tally = new Map<string, { plays: number; wins: number }>();
   for (const row of participants) {
+    const play = playById.get(row.playId);
+    if (!play) continue;
     const entry = tally.get(row.playerId) ?? { plays: 0, wins: 0 };
+    // Afbrudte partier tæller som spillet, men giver ingen sejr til nogen.
     entry.plays += 1;
-    if (row.placement !== null && bestByPlay.get(row.playId) === row.placement) {
-      entry.wins += 1;
-    }
+    if (isWinner(play, row, bestByPlay.get(row.playId) ?? null)) entry.wins += 1;
     tally.set(row.playerId, entry);
   }
 
