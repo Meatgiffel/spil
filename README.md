@@ -58,5 +58,11 @@ Se `BESLUTNINGER.md` for hvorfor det er skruet sådan sammen, og `PLAN.md` for h
 
 ## Status
 
-Appen er bygget og testet lokalt. **Deployment mangler** — `deploy/`-scripts, release-workflow og
-selve LXC'en er ikke lavet endnu. `PLAN.md` beskriver hvordan det skal gøres.
+I drift som `v0.1.0` i en LXC på hjemmeserveren. Ny version udgives ved at tagge:
+
+```bash
+git tag v0.2.0 && git push origin v0.2.0
+```
+
+GitHub Actions kører testene, bygger tarballen og lægger den som release. Derefter henter
+containeren den med `spil-update`. Se `deploy/README.md`.

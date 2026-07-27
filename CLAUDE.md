@@ -3,8 +3,8 @@
 Selvhostet app til at holde styr på hvilke brætspil man har spillet med sine venner.
 Offline-first PWA, hostet i en LXC på Proxmox-clusteret "Asgard".
 
-**Status: appen er bygget og testet lokalt, og deploy-filerne er skrevet.** Det der mangler er at
-oprette LXC'en og GitHub-repoet — se `deploy/README.md`.
+**Status: i drift.** `v0.1.0` kører i CT 117 på `balder` (192.168.50.42). Repo:
+`github.com/Meatgiffel/spil`. Opdatering sker ved at tagge `v*` — se `deploy/README.md`.
 
 | Fil | Indhold |
 |---|---|
