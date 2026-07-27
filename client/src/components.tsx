@@ -1,6 +1,7 @@
 import { cloneElement, useId, type ReactElement, type ReactNode } from "react";
 import { useNavigate } from "react-router";
 import { initials } from "./format.js";
+import { useT } from "./i18n/index.js";
 
 export function ScreenHead({
   title,
@@ -14,6 +15,7 @@ export function ScreenHead({
   steps?: { total: number; current: number };
 }) {
   const navigate = useNavigate();
+  const t = useT();
   return (
     <header className="screen-head">
       <div className="screen-head-row">
@@ -23,7 +25,7 @@ export function ScreenHead({
             className="btn-back"
             onClick={() => (typeof back === "function" ? back() : navigate(-1))}
           >
-            ← Tilbage
+            {t("nav.back")}
           </button>
         ) : (
           <span />
@@ -39,7 +41,7 @@ export function ScreenHead({
           aria-valuenow={steps.current}
           aria-valuemin={1}
           aria-valuemax={steps.total}
-          aria-label={`Trin ${steps.current} af ${steps.total}`}
+          aria-label={`${steps.current} / ${steps.total}`}
         >
           {Array.from({ length: steps.total }, (_, index) => (
             <span
@@ -132,8 +134,9 @@ export function Empty({
 }
 
 export function Loading({ rows = 3 }: { rows?: number }) {
+  const t = useT();
   return (
-    <div className="stack-tight" aria-busy="true" aria-label="Henter">
+    <div className="stack-tight" aria-busy="true" aria-label={t("app.loading")}>
       {Array.from({ length: rows }, (_, index) => (
         <div key={index} className="skeleton" />
       ))}
@@ -143,5 +146,6 @@ export function Loading({ rows = 3 }: { rows?: number }) {
 
 /** Vises på rækker der endnu ikke er nået frem til serveren. Ikke en advarsel. */
 export function PendingMark() {
-  return <span className="tag tag-outline">Gemmes senere</span>;
+  const t = useT();
+  return <span className="tag tag-outline">{t("banner.pending")}</span>;
 }

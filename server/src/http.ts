@@ -1,11 +1,16 @@
 import type { Response } from "express";
 import type { ZodError, ZodType } from "zod";
+import { errorText, type ErrorCode } from "@spil/shared";
 
 // Fejlsvar har altid samme form, så klienten kan vise feltspecifikke fejl uden
 // at gætte. Brugerens input bevares i UI'et — serveren sender det ikke retur.
 export type ApiError = {
   error: {
+    /** Stabil kode. Klienten oversætter den til brugerens sprog. */
+    code: ErrorCode;
+    /** Læsbar tekst, så et rå API-kald stadig giver mening. Fallback i klienten. */
     message: string;
+    /** Feltnavn → fejlkode. */
     fields?: Record<string, string>;
   };
 };
@@ -13,23 +18,21 @@ export type ApiError = {
 export class HttpError extends Error {
   constructor(
     readonly status: number,
-    message: string,
+    readonly code: ErrorCode,
+    /** Overskriver fallback-teksten. Bruges når serveren har noget ekstra at sige. */
+    message?: string,
     readonly fields?: Record<string, string>,
   ) {
-    super(message);
+    super(message ?? errorText(code));
     this.name = "HttpError";
   }
 }
 
-export const badRequest = (message: string, fields?: Record<string, string>) =>
-  new HttpError(400, message, fields);
-export const unauthorized = (message = "Du er ikke logget ind.") =>
-  new HttpError(401, message);
-export const forbidden = (message = "Du har ikke adgang til det her.") =>
-  new HttpError(403, message);
-export const notFound = (message = "Blev ikke fundet.") =>
-  new HttpError(404, message);
-export const conflict = (message: string) => new HttpError(409, message);
+export const badRequest = (code: ErrorCode, fields?: Record<string, string>) =>
+  new HttpError(400, code, undefined, fields);
+export const unauthorized = () => new HttpError(401, "unauthorized");
+export const forbidden = (code: ErrorCode = "forbidden") => new HttpError(403, code);
+export const notFound = (code: ErrorCode = "not_found") => new HttpError(404, code);
 
 export function fieldErrors(error: ZodError): Record<string, string> {
   const fields: Record<string, string> = {};
@@ -44,14 +47,18 @@ export function fieldErrors(error: ZodError): Record<string, string> {
 export function parseOrThrow<T>(schema: ZodType<T>, input: unknown): T {
   const result = schema.safeParse(input);
   if (!result.success) {
-    throw badRequest("Nogle felter er ikke udfyldt rigtigt.", fieldErrors(result.error));
+    throw badRequest("validation", fieldErrors(result.error));
   }
   return result.data;
 }
 
 export function sendError(res: Response, error: HttpError): void {
   const body: ApiError = {
-    error: { message: error.message, ...(error.fields ? { fields: error.fields } : {}) },
+    error: {
+      code: error.code,
+      message: error.message,
+      ...(error.fields ? { fields: error.fields } : {}),
+    },
   };
   res.status(error.status).json(body);
 }

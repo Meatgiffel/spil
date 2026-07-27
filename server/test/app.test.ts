@@ -19,12 +19,14 @@ describe("app-skallen", () => {
     assert.deepEqual(response.body, { status: "ok" });
   });
 
-  it("giver 404 med dansk besked på ukendt endpoint", async () => {
+  it("giver 404 med en fejlkode klienten kan oversætte", async () => {
     const response = await getJson(`${server.baseUrl}/api/findes-ikke`);
     assert.equal(response.status, 404);
-    assert.deepEqual(response.body, {
-      error: { message: "Endpointet findes ikke." },
-    });
+    // Koden er kontrakten. Teksten er kun fallback for klienter der ikke
+    // kender koden, så den må gerne ændre sig.
+    const body = response.body as { error: { code: string; message: string } };
+    assert.equal(body.error.code, "not_found");
+    assert.ok(body.error.message.length > 0);
   });
 
   it("har kørt migrations mod temp-databasen", async () => {

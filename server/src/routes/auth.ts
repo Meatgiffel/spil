@@ -26,7 +26,9 @@ import { allocateServerSeq } from "../sync.js";
 export function mountBetterAuth(app: Express): void {
   app.all("/api/auth/sign-up{/*rest}", (_req, _res, next) => {
     next(
-      badRequest(
+      new HttpError(
+        400,
+        "invite_key_missing",
         "Konti oprettes via /api/signup, hvor invitationsnøglen kontrolleres.",
       ),
     );
@@ -72,9 +74,7 @@ authRouter.post("/signup", async (req, res, next) => {
       .where(eq(userTable.email, email))
       .get();
     if (existing) {
-      throw badRequest("Der findes allerede en konto med den e-mailadresse.", {
-        email: "Der findes allerede en konto med den e-mailadresse.",
-      });
+      throw badRequest("email_taken", { email: "email_taken" });
     }
 
     const inviteKeyId = input.inviteKey ? consumeInviteKey(input.inviteKey) : null;

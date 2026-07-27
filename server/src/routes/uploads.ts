@@ -23,7 +23,7 @@ const upload = multer({
   limits: { fileSize: 12 * 1024 * 1024, files: 1 },
   fileFilter: (_req, file, callback) => {
     if (!(file.mimetype in EXTENSIONS)) {
-      callback(badRequest("Filtypen understøttes ikke. Brug JPEG, PNG, WebP eller HEIC."));
+      callback(badRequest("file_type"));
       return;
     }
     callback(null, true);
@@ -36,14 +36,14 @@ uploadsRouter.use(requireUser);
 
 uploadsRouter.post("/", upload.single("file"), async (req, res, next) => {
   try {
-    if (!req.file) throw badRequest("Der var ingen fil med.");
+    if (!req.file) throw badRequest("file_missing");
 
     const playId = String(req.body?.playId ?? "");
-    if (!playId) throw badRequest("Billedet mangler et parti.");
+    if (!playId) throw badRequest("play_missing");
 
     // Adgangsgrænsen er gruppen — også for filer.
     const groupId = playGroupId(playId);
-    if (!groupId) throw notFound("Partiet findes ikke.");
+    if (!groupId) throw notFound("play_not_found");
     assertGroupAccess(req.user!.id, groupId);
 
     const extension = EXTENSIONS[req.file.mimetype]!;

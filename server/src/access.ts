@@ -31,7 +31,7 @@ export function isGroupMember(userId: string, groupId: string): boolean {
 
 export function assertGroupAccess(userId: string, groupId: string): void {
   if (!isGroupMember(userId, groupId)) {
-    throw forbidden("Du er ikke medlem af den gruppe.");
+    throw forbidden("not_group_member");
   }
 }
 

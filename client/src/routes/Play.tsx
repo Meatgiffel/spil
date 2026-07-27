@@ -11,19 +11,16 @@ import {
   listPhotos,
 } from "../db/queries.js";
 import { sync } from "../db/sync.js";
-import { formatDate, formatDuration, formatTime } from "../format.js";
-import {
-  OUTCOME_LABELS,
-  bestPlacement,
-  formatSeconds,
-  isWinner,
-} from "../outcome.js";
+import { formatDate, formatDuration, formatSeconds, formatTime } from "../format.js";
+import { useT } from "../i18n/index.js";
+import { bestPlacement, isWinner, outcomeLabelKey } from "../outcome.js";
 import { useUser } from "../session.js";
 
 export function PlayScreen() {
   const { playId = "" } = useParams();
   const user = useUser();
   const navigate = useNavigate();
+  const t = useT();
 
   const data = useLiveQuery(async () => {
     const play = await getPlay(playId);
@@ -51,7 +48,7 @@ export function PlayScreen() {
   if (data === undefined) {
     return (
       <main className="screen">
-        <ScreenHead title="Parti" back />
+        <ScreenHead title={t("play.resultStep")} back />
         <div className="screen-body">
           <Loading />
         </div>
@@ -62,9 +59,9 @@ export function PlayScreen() {
   if (data === null) {
     return (
       <main className="screen">
-        <ScreenHead title="Parti" back />
+        <ScreenHead title={t("play.resultStep")} back />
         <div className="screen-body">
-          <Empty title="Partiet findes ikke" body="Det er måske blevet slettet." />
+          <Empty title={t("playDetail.notFoundTitle")} body={t("playDetail.notFoundBody")} />
         </div>
       </main>
     );
@@ -72,7 +69,7 @@ export function PlayScreen() {
 
   const { play, game, group, participants } = data;
   const best = bestPlacement(participants);
-  const duration = formatDuration(play.durationMinutes);
+  const duration = formatDuration(play.durationMinutes, t);
 
   return (
     <main className="screen">
@@ -81,18 +78,19 @@ export function PlayScreen() {
       <div className="screen-body">
         <div className="stack-tight">
           <span className="kicker">
-            {formatDate(play.playedAt)} kl. {formatTime(play.playedAt)}
+            {formatDate(play.playedAt)} {t("playDetail.at")} {formatTime(play.playedAt)}
           </span>
-          <h1>{game?.title ?? "Ukendt spil"}</h1>
+          <h1>{game?.title ?? "—"}</h1>
           <span className="lede">
-            {[play.location, duration].filter(Boolean).join(" · ") || "Ingen detaljer"}
+            {[play.location, duration].filter(Boolean).join(" · ") ||
+              t("playDetail.noDetails")}
           </span>
           {play.pending && <PendingMark />}
         </div>
 
         {play.abandoned && (
           <div className="banner">
-            <span className="grow">Partiet blev ikke spillet færdigt.</span>
+            <span className="grow">{t("playDetail.notFinished")}</span>
           </div>
         )}
 
@@ -101,40 +99,40 @@ export function PlayScreen() {
             <span className="grow">
               {play.outcomeType === "solo"
                 ? play.coopResult === "won"
-                  ? "Vundet."
-                  : "Tabt."
+                  ? t("playDetail.won")
+                  : t("playDetail.lost")
                 : play.coopResult === "won"
-                  ? "Holdet vandt."
-                  : "Holdet tabte."}
+                  ? t("playDetail.teamWonShort")
+                  : t("playDetail.teamLostShort")}
             </span>
           </div>
         )}
 
         {!play.abandoned && play.outcomeType === "teams" && play.winningTeam && (
           <div className="banner banner-accent">
-            <span className="grow">{play.winningTeam} vandt.</span>
+            <span className="grow">{t("playDetail.teamWon", { team: play.winningTeam })}</span>
           </div>
         )}
 
         {(play.milestone || play.timeRemainingSeconds !== null || play.difficulty) && (
           <section className="stack-tight">
-            <h2>Hvor langt nåede I</h2>
+            <h2>{t("playDetail.howFar")}</h2>
             <div className="card card-flat">
               {play.milestone && (
                 <div className="spread">
-                  <span className="muted">Nåede til</span>
+                  <span className="muted">{t("playDetail.reached")}</span>
                   <span className="name">{play.milestone}</span>
                 </div>
               )}
               {play.timeRemainingSeconds !== null && (
                 <div className="spread">
-                  <span className="muted">Tid tilbage</span>
-                  <span className="name">{formatSeconds(play.timeRemainingSeconds)}</span>
+                  <span className="muted">{t("playDetail.timeLeft")}</span>
+                  <span className="name">{formatSeconds(play.timeRemainingSeconds, t)}</span>
                 </div>
               )}
               {play.difficulty && (
                 <div className="spread">
-                  <span className="muted">Sværhedsgrad</span>
+                  <span className="muted">{t("playDetail.difficultyLabel")}</span>
                   <span className="name">{play.difficulty}</span>
                 </div>
               )}
@@ -144,8 +142,8 @@ export function PlayScreen() {
 
         <section className="stack-tight">
           <div className="spread">
-            <h2>Deltagere</h2>
-            <span className="kicker">{OUTCOME_LABELS[play.outcomeType]}</span>
+            <h2>{t("playDetail.participants")}</h2>
+            <span className="kicker">{t(outcomeLabelKey(play.outcomeType))}</span>
           </div>
           {participants.map((row) => {
             const winner = isWinner(play, row, best);
@@ -163,11 +161,15 @@ export function PlayScreen() {
                   onAccent={winner}
                 />
                 <span className={winner ? "name name-winner" : "name"}>
-                  {row.player?.name ?? "Ukendt"}
+                  {row.player?.name ?? "—"}
                 </span>
                 {row.team && <span className="tag tag-outline">{row.team}</span>}
-                {row.score !== null && <span className="kicker">{row.score} p.</span>}
-                {winner && <span className="kicker">VINDER</span>}
+                {row.score !== null && (
+                  <span className="kicker">
+                    {t("playDetail.points", { count: row.score })}
+                  </span>
+                )}
+                {winner && <span className="kicker">{t("play.winner")}</span>}
               </div>
             );
           })}
@@ -175,13 +177,13 @@ export function PlayScreen() {
 
         {play.notes && (
           <section className="stack-tight">
-            <h2>Noter</h2>
+            <h2>{t("playDetail.notesHeading")}</h2>
             <p style={{ whiteSpace: "pre-wrap" }}>{play.notes}</p>
           </section>
         )}
 
         <section className="stack-tight">
-          <h2>Billeder</h2>
+          <h2>{t("playDetail.photos")}</h2>
 
           {photos.length > 0 && (
             <div className="grid-2" style={{ display: "grid", gap: "var(--s2)" }}>
@@ -197,7 +199,7 @@ export function PlayScreen() {
                       className="tag tag-outline"
                       style={{ position: "absolute", left: 6, bottom: 6, background: "var(--bg)" }}
                     >
-                      Sendes senere
+                      {t("playDetail.photoPending")}
                     </figcaption>
                   )}
                 </figure>
@@ -207,7 +209,7 @@ export function PlayScreen() {
 
           {/* capture=environment åbner kameraet direkte på telefonen. */}
           <label className="btn btn-secondary btn-block" style={{ cursor: "pointer" }}>
-            Tilføj billede
+            {t("playDetail.addPhoto")}
             <input
               type="file"
               accept="image/*"
@@ -231,13 +233,13 @@ export function PlayScreen() {
           className="btn btn-danger btn-block"
           type="button"
           onClick={async () => {
-            if (!confirm("Slet partiet?")) return;
+            if (!confirm(t("playDetail.deleteConfirm"))) return;
             await remove("play", playId, user);
             void sync();
             navigate(-1);
           }}
         >
-          Slet parti
+          {t("playDetail.deletePlay")}
         </button>
       </div>
     </main>

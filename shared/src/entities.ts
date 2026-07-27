@@ -2,17 +2,18 @@ import { z } from "zod";
 
 // Alle id'er er UUIDv7 genereret på klienten, så offline-oprettelser aldrig kolliderer.
 // Serveren accepterer klientens id og må ikke omskrive det.
-export const idSchema = z.uuid({ error: "Ugyldigt id." });
+export const idSchema = z.uuid({ error: "id_invalid" });
 
 // Better Auth genererer sine egne bruger-id'er, som ikke er UUID'er.
 export const userIdSchema = z.string().min(1).max(64);
 
+// Beskeden er en fejlkode, ikke prosa — klienten oversætter den.
 const trimmedText = (max: number, label: string) =>
   z
     .string()
     .trim()
-    .min(1, { error: `${label} må ikke være tom.` })
-    .max(max, { error: `${label} må højst være ${max} tegn.` });
+    .min(1, { error: `${label}_required` })
+    .max(max, { error: `${label}_too_long` });
 
 const optionalText = (max: number) =>
   z.string().trim().max(max).nullable().default(null);
@@ -22,14 +23,14 @@ const optionalInt = (min: number, max: number) =>
 
 export const groupSchema = z.object({
   id: idSchema,
-  name: trimmedText(80, "Gruppenavnet"),
+  name: trimmedText(80, "group_name"),
 });
 
 export const playerSchema = z.object({
   id: idSchema,
   // Er userId sat, er spilleren en rigtig konto. Er den null, er det en gæst uden konto.
   userId: userIdSchema.nullable().default(null),
-  name: trimmedText(80, "Spillernavnet"),
+  name: trimmedText(80, "player_name"),
 });
 
 export const groupMemberSchema = z.object({
@@ -52,7 +53,7 @@ export const outcomeTypeSchema = z.enum(OUTCOME_TYPES);
 
 export const gameSchema = z.object({
   id: idSchema,
-  title: trimmedText(200, "Spiltitlen"),
+  title: trimmedText(200, "game_title"),
   // Huskes fra sidste parti, så registreringen ikke skal spørge hver gang.
   defaultOutcomeType: outcomeTypeSchema.nullable().default(null),
   // 6 nimmt!, golf og andre hvor færrest point vinder.
@@ -104,7 +105,7 @@ export const playParticipantSchema = z.object({
 export const photoSchema = z.object({
   id: idSchema,
   playId: idSchema,
-  filePath: trimmedText(300, "Filstien"),
+  filePath: trimmedText(300, "file_path"),
   width: optionalInt(1, 20000),
   height: optionalInt(1, 20000),
   takenAt: z.number().int().min(0).nullable().default(null),

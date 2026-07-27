@@ -94,10 +94,7 @@ describe("auth og invitationsnøgler", () => {
       inviteKey: "abcd-efgh-ijkm",
     });
     assert.equal(response.status, 400);
-    assert.equal(
-      ((response.body as Json).error as Json).message,
-      "Invitationsnøglen er ikke gyldig.",
-    );
+    assert.equal(((response.body as Json).error as Json).code, "invite_key_invalid");
   });
 
   it("blokerer Better Auths eget sign-up-endpoint", async () => {
@@ -215,7 +212,7 @@ describe("auth og invitationsnøgler", () => {
     });
     assert.equal(response.status, 400);
     const fields = ((response.body as Json).error as Json).fields as Json;
-    assert.match(String(fields.password), /mindst 6 tegn/);
+    assert.equal(fields.password, "password_min");
   });
 
   it("nægter en almindelig bruger adgang til nøgleadministration", async () => {

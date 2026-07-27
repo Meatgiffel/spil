@@ -1,6 +1,7 @@
 import { db, type LocalPlay, type LocalPlayer } from "./local.js";
-import { byName } from "../format.js";
+import { byName, byTitle, compareNames } from "../format.js";
 import { bestPlacement, isWinner, outcomeSummary } from "../outcome.js";
+import type { Translate } from "../i18n/index.js";
 
 /**
  * Alle forespørgsler filtrerer soft-slettede rækker fra. Rækkerne bliver
@@ -46,7 +47,7 @@ export async function listParticipants(playId: string) {
     .sort((a, b) => {
       // Uden placering (co-op) sorteres på navn; ellers på placering.
       if (a.placement === null && b.placement === null) {
-        return (a.player?.name ?? "").localeCompare(b.player?.name ?? "", "da");
+        return compareNames(a.player?.name ?? "", b.player?.name ?? "");
       }
       if (a.placement === null) return 1;
       if (b.placement === null) return -1;
@@ -81,7 +82,7 @@ export async function listPhotos(playId: string): Promise<PhotoView[]> {
 }
 
 export async function listGames() {
-  return alive(await db.game.toArray()).sort((a, b) => a.title.localeCompare(b.title, "da"));
+  return alive(await db.game.toArray()).sort(byTitle);
 }
 
 export async function getGame(gameId: string) {
@@ -104,7 +105,10 @@ export type PlaySummary = LocalPlay & {
 };
 
 /** Bruges til feeds. Slår spil, gruppe og vindere op i én omgang. */
-export async function summarisePlays(plays: LocalPlay[]): Promise<PlaySummary[]> {
+export async function summarisePlays(
+  plays: LocalPlay[],
+  t: Translate,
+): Promise<PlaySummary[]> {
   if (plays.length === 0) return [];
 
   const games = await db.game.bulkGet([...new Set(plays.map((play) => play.gameId))]);
@@ -140,7 +144,7 @@ export async function summarisePlays(plays: LocalPlay[]): Promise<PlaySummary[]>
       gameTitle: gameTitles.get(play.gameId) ?? "Ukendt spil",
       groupName: groupNames.get(play.groupId) ?? "Ukendt gruppe",
       winners,
-      summary: outcomeSummary(play, winners),
+      summary: outcomeSummary(play, winners, t),
       participantCount: mine.length,
     };
   });
@@ -211,7 +215,7 @@ export async function groupStats(groupId: string): Promise<{
         title: gameTitles.get(gameId) ?? "Ukendt spil",
         count,
       }))
-      .sort((a, b) => b.count - a.count || a.title.localeCompare(b.title, "da"))
+      .sort((a, b) => b.count - a.count || byTitle(a, b))
       .slice(0, 5),
     totalPlays: plays.length,
   };

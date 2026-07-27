@@ -7,21 +7,22 @@ import { Avatar, Empty, Field, ScreenHead } from "../components.js";
 import { mutate, type LocalPlayer } from "../db/local.js";
 import { listGames, listGroupPlayers, listGroups } from "../db/queries.js";
 import { sync } from "../db/sync.js";
-import { plural } from "../format.js";
-import { OUTCOME_HINTS, OUTCOME_LABELS, placementsFromScores } from "../outcome.js";
+import { useT } from "../i18n/index.js";
+import { outcomeHintKey, outcomeLabelKey, placementsFromScores } from "../outcome.js";
 import { useUser } from "../session.js";
 
 type Step = "gruppe" | "spil" | "hvem" | "resultat" | "detaljer";
 
 const FLOW: Step[] = ["spil", "hvem", "resultat", "detaljer"];
 
-/** Standardnavne på hold. Kan overskrives, men dækker de fleste tilfælde. */
-const DEFAULT_TEAMS = ["Hold 1", "Hold 2"];
-
 export function NewPlayScreen() {
   const user = useUser();
   const navigate = useNavigate();
   const params = useParams();
+  const t = useT();
+
+  /** Standardnavne på hold. Kan overskrives, men dækker de fleste tilfælde. */
+  const DEFAULT_TEAMS = [t("outcome.team1"), t("outcome.team2")];
 
   const [groupId, setGroupId] = useState(params.groupId ?? "");
   const [step, setStep] = useState<Step>(params.groupId ? "spil" : "gruppe");
@@ -258,7 +259,7 @@ export function NewPlayScreen() {
       }
 
       void sync();
-      navigate(`/partier/${playId}`, { replace: true });
+      navigate(`/plays/${playId}`, { replace: true });
     } finally {
       setSaving(false);
     }
@@ -269,11 +270,11 @@ export function NewPlayScreen() {
   if (step === "gruppe") {
     return (
       <main className="screen">
-        <ScreenHead title="Gruppe" back={() => navigate(-1)} />
+        <ScreenHead title={t("play.groupStep")} back={() => navigate(-1)} />
         <div className="screen-body">
-          <h2>Hvilken gruppe?</h2>
+          <h2>{t("play.whichGroup")}</h2>
           {groups?.length === 0 && (
-            <Empty title="Ingen grupper" body="Opret en gruppe først." />
+            <Empty title={t("play.noGroups")} body={t("play.createGroupFirst")} />
           )}
           <div className="stack-tight">
             {(groups ?? []).map((group) => (
@@ -301,18 +302,18 @@ export function NewPlayScreen() {
     return (
       <main className="screen">
         <ScreenHead
-          title="Spil"
+          title={t("play.gameStep")}
           back={() => (params.groupId ? navigate(-1) : setStep("gruppe"))}
           right={`1 / ${FLOW.length}`}
           steps={{ total: FLOW.length, current: 1 }}
         />
         <div className="screen-body">
-          <h2>Hvilket spil?</h2>
-          <Field label="Søg i biblioteket">
+          <h2>{t("play.whichGame")}</h2>
+          <Field label={t("play.searchLibrary")}>
             <input
               className="input"
               value={gameFilter}
-              placeholder="Skriv titlen"
+              placeholder={t("play.typeTitle")}
               onChange={(event) => {
                 setGameFilter(event.target.value);
                 setNewGameTitle(event.target.value);
@@ -335,7 +336,7 @@ export function NewPlayScreen() {
                 <span className="name">{game.title}</span>
                 {game.defaultOutcomeType && (
                   <span className="kicker">
-                    {OUTCOME_LABELS[game.defaultOutcomeType as OutcomeType]}
+                    {t(outcomeLabelKey(game.defaultOutcomeType as OutcomeType))}
                   </span>
                 )}
               </button>
@@ -352,8 +353,8 @@ export function NewPlayScreen() {
                 setStep("hvem");
               }}
             >
-              <span className="name">Opret “{gameFilter.trim()}”</span>
-              <span className="kicker">Nyt</span>
+              <span className="name">{t("play.createGame", { title: gameFilter.trim() })}</span>
+              <span className="kicker">{t("play.new")}</span>
             </button>
           )}
         </div>
@@ -367,13 +368,13 @@ export function NewPlayScreen() {
     return (
       <main className="screen">
         <ScreenHead
-          title="Deltagere"
+          title={t("play.participantsStep")}
           back={() => setStep("spil")}
           right={`2 / ${FLOW.length}`}
           steps={{ total: FLOW.length, current: 2 }}
         />
         <div className="screen-body">
-          <h2>Hvem var med?</h2>
+          <h2>{t("play.whoPlayed")}</h2>
           <div className="stack-tight">
             {(players ?? []).map((player: LocalPlayer) => {
               const on = selected.has(player.id);
@@ -387,7 +388,7 @@ export function NewPlayScreen() {
                 >
                   <Avatar name={player.name} guest={player.userId === null} onAccent={on} />
                   <span className="name">{player.name}</span>
-                  {on && <span className="kicker">MED</span>}
+                  {on && <span className="kicker">{t("play.included")}</span>}
                 </button>
               );
             })}
@@ -400,7 +401,7 @@ export function NewPlayScreen() {
             disabled={selected.size === 0}
             onClick={() => setStep("resultat")}
           >
-            Videre · {plural(selected.size, "spiller", "spillere")}
+            {t("action.next")} · {t.count("group.playerCount", selected.size)}
           </button>
         </div>
       </main>
@@ -419,7 +420,7 @@ export function NewPlayScreen() {
     return (
       <main className="screen">
         <ScreenHead
-          title="Resultat"
+          title={t("play.resultStep")}
           back={() => setStep("hvem")}
           right={`3 / ${FLOW.length}`}
           steps={{ total: FLOW.length, current: 3 }}
@@ -427,8 +428,8 @@ export function NewPlayScreen() {
 
         <div className="screen-body">
           <div className="stack-tight">
-            <span className="kicker">Sådan afgøres spillet</span>
-            <div className="seg" role="group" aria-label="Type resultat">
+            <span className="kicker">{t("play.howDecided")}</span>
+            <div className="seg" role="group" aria-label={t("play.resultType")}>
               {OUTCOME_TYPES.map((type) => (
                 <button
                   key={type}
@@ -437,19 +438,17 @@ export function NewPlayScreen() {
                   aria-pressed={outcomeType === type}
                   onClick={() => setOutcomeType(type)}
                 >
-                  {OUTCOME_LABELS[type]}
+                  {t(outcomeLabelKey(type))}
                 </button>
               ))}
             </div>
-            <span className="lede">{OUTCOME_HINTS[outcomeType]}</span>
+            <span className="lede">{t(outcomeHintKey(outcomeType))}</span>
           </div>
 
           {abandoned ? (
             <div className="empty">
-              <h3>Partiet blev afbrudt</h3>
-              <p className="lede">
-                Det bliver gemt uden vinder og tæller ikke med i sejrsstatistikken.
-              </p>
+              <h3>{t("play.abandonedTitle")}</h3>
+              <p className="lede">{t("play.abandonedBody")}</p>
             </div>
           ) : (
             <>
@@ -474,7 +473,7 @@ export function NewPlayScreen() {
                         <span className={winner ? "name name-winner" : "name"}>
                           {player.name}
                         </span>
-                        <span className="kicker">{winner ? "VINDER" : "×"}</span>
+                        <span className="kicker">{winner ? t("play.winner") : "×"}</span>
                       </button>
                     );
                   })}
@@ -482,7 +481,7 @@ export function NewPlayScreen() {
                   {unranked.length > 0 && (
                     <>
                       <hr className="rule" />
-                      <span className="kicker">Mangler placering</span>
+                      <span className="kicker">{t("play.missingPlacement")}</span>
                       {unranked.map((player) => (
                         <button
                           key={player.id}
@@ -494,7 +493,7 @@ export function NewPlayScreen() {
                           <Avatar name={player.name} guest={player.userId === null} />
                           <span className="name muted">{player.name}</span>
                           <span className="kicker" style={{ color: "var(--accent)" }}>
-                            TRYK
+                            {t("play.tap")}
                           </span>
                         </button>
                       ))}
@@ -514,7 +513,7 @@ export function NewPlayScreen() {
                         style={{ width: 96, minHeight: 44 }}
                         type="number"
                         inputMode="numeric"
-                        aria-label={`Point til ${player.name}`}
+                        aria-label={t("play.pointsFor", { name: player.name })}
                         value={scores.get(player.id) ?? ""}
                         onChange={(event) =>
                           setScores((current) =>
@@ -535,21 +534,21 @@ export function NewPlayScreen() {
                     }
                     onClick={() => setLowScoreWins((value) => !value)}
                   >
-                    {lowScoreWins ? "Færrest point vinder" : "Flest point vinder"}
+                    {lowScoreWins ? t("play.lowestWins") : t("play.highestWins")}
                   </button>
                 </div>
               )}
 
               {(outcomeType === "coop" || outcomeType === "solo") && (
                 <div className="stack">
-                  <div className="seg" role="group" aria-label="Resultat">
+                  <div className="seg" role="group" aria-label={t("play.result")}>
                     <button
                       className="seg-opt"
                       type="button"
                       aria-pressed={coop === "won"}
                       onClick={() => setCoop("won")}
                     >
-                      {outcomeType === "solo" ? "Jeg vandt" : "Vi vandt"}
+                      {outcomeType === "solo" ? t("play.iWon") : t("play.weWon")}
                     </button>
                     <button
                       className="seg-opt"
@@ -557,7 +556,7 @@ export function NewPlayScreen() {
                       aria-pressed={coop === "lost"}
                       onClick={() => setCoop("lost")}
                     >
-                      {outcomeType === "solo" ? "Jeg tabte" : "Vi tabte"}
+                      {outcomeType === "solo" ? t("play.iLost") : t("play.weLost")}
                     </button>
                   </div>
                 </div>
@@ -565,7 +564,7 @@ export function NewPlayScreen() {
 
               {outcomeType === "teams" && (
                 <div className="stack">
-                  <span className="lede">Tryk på en spiller for at skifte hold.</span>
+                  <span className="lede">{t("play.tapToChangeTeam")}</span>
                   <div className="stack-tight">
                     {chosenPlayers.map((player) => {
                       const team = teams.get(player.id);
@@ -583,15 +582,15 @@ export function NewPlayScreen() {
                             onAccent={winner}
                           />
                           <span className="name">{player.name}</span>
-                          <span className="kicker">{team ?? "VÆLG HOLD"}</span>
+                          <span className="kicker">{team ?? t("play.chooseTeam")}</span>
                         </button>
                       );
                     })}
                   </div>
 
                   <hr className="rule" />
-                  <span className="kicker">Hvilket hold vandt?</span>
-                  <div className="seg" role="group" aria-label="Vindende hold">
+                  <span className="kicker">{t("play.whichTeamWon")}</span>
+                  <div className="seg" role="group" aria-label={t("play.winningTeam")}>
                     {teamNames().map((name) => (
                       <button
                         key={name}
@@ -612,8 +611,8 @@ export function NewPlayScreen() {
                 <>
                   <hr className="rule" />
                   <Field
-                    label="Hvor langt nåede I? (valgfrit)"
-                    hint="Fx “Boss 4” eller “Mission 23”."
+                    label={t("play.milestone")}
+                    hint={t("play.milestoneHint")}
                   >
                     <input
                       className="input"
@@ -622,7 +621,7 @@ export function NewPlayScreen() {
                       onChange={(event) => setMilestone(event.target.value)}
                     />
                   </Field>
-                  <Field label="Sekunder tilbage (valgfrit)">
+                  <Field label={t("play.timeRemaining")}>
                     <input
                       className="input"
                       type="number"
@@ -632,12 +631,12 @@ export function NewPlayScreen() {
                       onChange={(event) => setTimeRemaining(event.target.value)}
                     />
                   </Field>
-                  <Field label="Sværhedsgrad (valgfrit)">
+                  <Field label={t("play.difficulty")}>
                     <input
                       className="input"
                       value={difficulty}
                       maxLength={40}
-                      placeholder="Fx “Heroic”"
+                      placeholder={t("play.difficultyPlaceholder")}
                       onChange={(event) => setDifficulty(event.target.value)}
                     />
                   </Field>
@@ -662,14 +661,14 @@ export function NewPlayScreen() {
                   }
                   onClick={() => setTieMode((value) => !value)}
                 >
-                  Uafgjort {tieMode ? "til" : "fra"}
+                  {tieMode ? t("play.tieOn") : t("play.tieOff")}
                 </button>
                 <button
                   className="btn btn-secondary"
                   type="button"
                   onClick={() => setRanking(new Map())}
                 >
-                  Ryd
+                  {t("play.clear")}
                 </button>
               </>
             )}
@@ -679,7 +678,7 @@ export function NewPlayScreen() {
               aria-pressed={abandoned}
               onClick={() => setAbandoned((value) => !value)}
             >
-              {abandoned ? "Afbrudt ✓" : "Vi spillede ikke færdig"}
+              {abandoned ? t("play.abandonedOn") : t("play.abandonedToggle")}
             </button>
           </div>
           <button
@@ -688,7 +687,7 @@ export function NewPlayScreen() {
             disabled={!resultatKlar()}
             onClick={() => setStep("detaljer")}
           >
-            Videre
+            {t("action.next")}
           </button>
         </div>
       </main>
@@ -700,13 +699,13 @@ export function NewPlayScreen() {
   return (
     <main className="screen">
       <ScreenHead
-        title="Detaljer"
+        title={t("play.detailsStep")}
         back={() => setStep("resultat")}
         right={`4 / ${FLOW.length}`}
         steps={{ total: FLOW.length, current: 4 }}
       />
       <div className="screen-body">
-        <Field label="Hvornår">
+        <Field label={t("play.when")}>
           <input
             className="input"
             type="datetime-local"
@@ -714,16 +713,16 @@ export function NewPlayScreen() {
             onChange={(event) => setPlayedAt(event.target.value)}
           />
         </Field>
-        <Field label="Hvor (valgfrit)">
+        <Field label={t("play.where")}>
           <input
             className="input"
             value={location}
             maxLength={120}
-            placeholder="Hjemme hos…"
+            placeholder={t("play.wherePlaceholder")}
             onChange={(event) => setLocation(event.target.value)}
           />
         </Field>
-        <Field label="Varighed i minutter (valgfrit)">
+        <Field label={t("play.duration")}>
           <input
             className="input"
             type="number"
@@ -733,7 +732,7 @@ export function NewPlayScreen() {
             onChange={(event) => setDuration(event.target.value)}
           />
         </Field>
-        <Field label="Noter (valgfrit)">
+        <Field label={t("play.notes")}>
           <textarea
             className="input"
             value={notes}
@@ -749,7 +748,7 @@ export function NewPlayScreen() {
           disabled={saving || (!gameId && !newGameTitle.trim())}
           onClick={() => void save()}
         >
-          {saving ? "Gemmer…" : "Gem parti"}
+          {saving ? t("play.saving") : t("play.savePlay")}
         </button>
       </div>
     </main>

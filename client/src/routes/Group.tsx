@@ -18,13 +18,15 @@ import {
   summarisePlays,
 } from "../db/queries.js";
 import { sync } from "../db/sync.js";
-import { formatDay, plural } from "../format.js";
+import { formatDay } from "../format.js";
+import { useT } from "../i18n/index.js";
 import { useUser } from "../session.js";
 
 export function GroupScreen() {
   const { groupId = "" } = useParams();
   const user = useUser();
   const navigate = useNavigate();
+  const t = useT();
   const [guestName, setGuestName] = useState("");
   const [adding, setAdding] = useState(false);
 
@@ -35,8 +37,8 @@ export function GroupScreen() {
       listGroupPlayers(groupId),
       listPlays(groupId),
     ]);
-    return { group, players, plays: await summarisePlays(plays.slice(0, 20)) };
-  }, [groupId]);
+    return { group, players, plays: await summarisePlays(plays.slice(0, 20), t) };
+  }, [groupId, t]);
 
   async function addGuest(event: FormEvent) {
     event.preventDefault();
@@ -60,7 +62,7 @@ export function GroupScreen() {
   if (data === undefined) {
     return (
       <main className="screen">
-        <ScreenHead title="Gruppe" back />
+        <ScreenHead title={t("play.groupStep")} back />
         <div className="screen-body">
           <Loading />
         </div>
@@ -71,9 +73,9 @@ export function GroupScreen() {
   if (data === null) {
     return (
       <main className="screen">
-        <ScreenHead title="Gruppe" back />
+        <ScreenHead title={t("play.groupStep")} back />
         <div className="screen-body">
-          <Empty title="Gruppen findes ikke" body="Den er måske blevet slettet." />
+          <Empty title={t("group.notFoundTitle")} body={t("group.notFoundBody")} />
         </div>
       </main>
     );
@@ -89,15 +91,15 @@ export function GroupScreen() {
         <button
           className="btn btn-primary btn-block"
           type="button"
-          onClick={() => navigate(`/nyt-parti/${groupId}`)}
+          onClick={() => navigate(`/plays/new/${groupId}`)}
         >
-          Registrer parti
+          {t("home.recordPlay")}
         </button>
 
         <section className="stack">
           <div className="spread">
-            <h2>Medlemmer</h2>
-            <span className="kicker">{plural(players.length, "spiller", "spillere")}</span>
+            <h2>{t("group.members")}</h2>
+            <span className="kicker">{t.count("group.playerCount", players.length)}</span>
           </div>
 
           <div className="stack-tight">
@@ -105,7 +107,7 @@ export function GroupScreen() {
               <div key={player.id} className="list-row">
                 <Avatar name={player.name} guest={player.userId === null} />
                 <span className="name">{player.name}</span>
-                {player.userId === null && <span className="tag tag-outline">Gæst</span>}
+                {player.userId === null && <span className="tag tag-outline">{t("group.guest")}</span>}
                 {player.pending && <PendingMark />}
               </div>
             ))}
@@ -113,10 +115,7 @@ export function GroupScreen() {
 
           {adding ? (
             <form className="stack" onSubmit={addGuest}>
-              <Field
-                label="Navn på gæsten"
-                hint="En gæst har ingen konto. Du kan tilføje dem nu og lade dem oprette sig senere."
-              >
+              <Field label={t("group.guestName")} hint={t("group.guestHint")}>
                 <input
                   className="input"
                   autoFocus
@@ -131,14 +130,14 @@ export function GroupScreen() {
                   type="submit"
                   disabled={!guestName.trim()}
                 >
-                  Tilføj
+                  {t("group.add")}
                 </button>
                 <button
                   className="btn btn-secondary"
                   type="button"
                   onClick={() => setAdding(false)}
                 >
-                  Fortryd
+                  {t("action.cancel")}
                 </button>
               </div>
             </form>
@@ -148,7 +147,7 @@ export function GroupScreen() {
               type="button"
               onClick={() => setAdding(true)}
             >
-              Tilføj gæst
+              {t("group.addGuest")}
             </button>
           )}
         </section>
@@ -157,25 +156,25 @@ export function GroupScreen() {
 
         <section className="stack">
           <div className="spread">
-            <h2>Seneste partier</h2>
-            <Link className="btn btn-ghost" to={`/grupper/${groupId}/statistik`}>
-              Statistik
+            <h2>{t("group.recentPlays")}</h2>
+            <Link className="btn btn-ghost" to={`/groups/${groupId}/stats`}>
+              {t("group.stats")}
             </Link>
           </div>
 
           {plays.length === 0 ? (
             <Empty
-              title="Ingen partier endnu"
-              body="Registrer det første, så begynder statistikken at give mening."
+              title={t("group.noPlaysTitle")}
+              body={t("group.noPlaysBody")}
             />
           ) : (
             <div className="stack-tight">
               {plays.map((play) => (
-                <Link key={play.id} className="list-row" to={`/partier/${play.id}`}>
+                <Link key={play.id} className="list-row" to={`/plays/${play.id}`}>
                   <span className="stack-tight grow">
                     <span className="name">{play.gameTitle}</span>
                     <span className="kicker">
-                      {formatDay(play.playedAt)} · {play.summary}
+                      {formatDay(play.playedAt, t)} · {play.summary}
                     </span>
                   </span>
                   {play.pending && <PendingMark />}
@@ -191,13 +190,13 @@ export function GroupScreen() {
           className="btn btn-danger btn-block"
           type="button"
           onClick={async () => {
-            if (!confirm(`Slet "${group.name}"? Partierne forsvinder også.`)) return;
+            if (!confirm(t("group.deleteConfirm", { name: group.name }))) return;
             await remove("group", groupId, user);
             void sync();
-            navigate("/grupper");
+            navigate("/groups");
           }}
         >
-          Slet gruppe
+          {t("group.delete")}
         </button>
       </div>
     </main>

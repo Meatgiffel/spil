@@ -6,11 +6,12 @@ import { Empty, Field, Loading, PendingMark, ScreenHead } from "../components.js
 import { mutate } from "../db/local.js";
 import { listGroupPlayers, listGroups, ownPlayer } from "../db/queries.js";
 import { sync } from "../db/sync.js";
-import { plural } from "../format.js";
+import { useT } from "../i18n/index.js";
 import { useUser } from "../session.js";
 
 export function GroupsScreen() {
   const user = useUser();
+  const t = useT();
   const [name, setName] = useState("");
   const [open, setOpen] = useState(false);
 
@@ -49,12 +50,12 @@ export function GroupsScreen() {
 
   return (
     <main className="screen">
-      <ScreenHead title="Grupper" />
+      <ScreenHead title={t("groups.title")} />
 
       <div className="screen-body">
         {open ? (
           <form className="stack" onSubmit={createGroup}>
-            <Field label="Navn på gruppen">
+            <Field label={t("groups.name")}>
               <input
                 className="input"
                 autoFocus
@@ -65,14 +66,14 @@ export function GroupsScreen() {
             </Field>
             <div className="row">
               <button className="btn btn-primary grow" type="submit" disabled={!name.trim()}>
-                Opret
+                {t("action.create")}
               </button>
               <button
                 className="btn btn-secondary"
                 type="button"
                 onClick={() => setOpen(false)}
               >
-                Fortryd
+                {t("action.cancel")}
               </button>
             </div>
           </form>
@@ -82,7 +83,7 @@ export function GroupsScreen() {
             type="button"
             onClick={() => setOpen(true)}
           >
-            Ny gruppe
+            {t("groups.new")}
           </button>
         )}
 
@@ -90,18 +91,20 @@ export function GroupsScreen() {
 
         {groups?.length === 0 && (
           <Empty
-            title="Ingen grupper"
-            body="En gruppe samler de spillere I plejer at spille med — både dem med konto og gæster uden."
+            title={t("groups.emptyTitle")}
+            body={t("groups.emptyBody")}
           />
         )}
 
         {groups && groups.length > 0 && (
           <section className="stack-tight">
             {groups.map((group) => (
-              <Link key={group.id} className="list-row" to={`/grupper/${group.id}`}>
+              <Link key={group.id} className="list-row" to={`/groups/${group.id}`}>
                 <span className="name">{group.name}</span>
                 {group.pending && <PendingMark />}
-                <span className="kicker">{plural(group.memberCount, "medlem", "medlemmer")}</span>
+                <span className="kicker">
+                  {t.count("groups.memberCount", group.memberCount)}
+                </span>
               </Link>
             ))}
           </section>

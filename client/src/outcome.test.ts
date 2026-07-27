@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { OutcomeType } from "@spil/shared";
+import { createTranslate } from "./i18n/index.js";
 import { bestPlacement, isWinner, outcomeSummary, placementsFromScores } from "./outcome.js";
+
+const en = createTranslate("en");
+const da = createTranslate("da");
 
 // Den bredeste af de to signaturer, så samme hjælper kan bruges til begge.
 // isWinner tager en delmængde af felterne og accepterer derfor objektet.
@@ -125,35 +129,39 @@ describe("placeringer ud fra point", () => {
 
 describe("resumé til feed", () => {
   it("nævner vinderen ved rangering", () => {
-    expect(outcomeSummary(play({ milestone: null, timeRemainingSeconds: null }), ["Ida"])).toBe(
-      "Ida vandt",
-    );
+    expect(outcomeSummary(play(), ["Ida"], en)).toBe("Ida won");
+    expect(outcomeSummary(play(), ["Ida"], da)).toBe("Ida vandt");
+  });
+
+  it("binder flere vindere sammen på sprogets egen måde", () => {
+    expect(outcomeSummary(play(), ["Ida", "Sofie"], en)).toBe("Ida and Sofie won");
+    expect(outcomeSummary(play(), ["Ida", "Sofie"], da)).toBe("Ida og Sofie vandt");
   });
 
   it("tager milepæl og resttid med ved samarbejde", () => {
-    const summary = outcomeSummary(
-      play({
-        outcomeType: "coop",
-        coopResult: "lost",
-        milestone: "Boss 4",
-        timeRemainingSeconds: 7,
-      }),
-      [],
-    );
-    expect(summary).toBe("Alle tabte · Boss 4 · 7 sek. tilbage");
+    const coop = play({
+      outcomeType: "coop",
+      coopResult: "lost",
+      milestone: "Boss 4",
+      timeRemainingSeconds: 7,
+    });
+    expect(outcomeSummary(coop, [], en)).toBe("Everyone lost · Boss 4 · 7 sec left");
+    expect(outcomeSummary(coop, [], da)).toBe("Alle tabte · Boss 4 · 7 sek. tilbage");
   });
 
   it("formaterer minutter når der er mere end et minut tilbage", () => {
-    const summary = outcomeSummary(
-      play({ outcomeType: "coop", coopResult: "won", timeRemainingSeconds: 125 }),
-      [],
-    );
-    expect(summary).toBe("Alle vandt · 2 min. 5 sek. tilbage");
+    const coop = play({
+      outcomeType: "coop",
+      coopResult: "won",
+      timeRemainingSeconds: 125,
+    });
+    expect(outcomeSummary(coop, [], en)).toBe("Everyone won · 2 min 5 sec left");
+    expect(outcomeSummary(coop, [], da)).toBe("Alle vandt · 2 min. 5 sek. tilbage");
   });
 
   it("siger afbrudt og intet andet", () => {
-    expect(
-      outcomeSummary(play({ abandoned: true, milestone: "Boss 4" }), ["Ida"]),
-    ).toBe("Afbrudt");
+    const abandoned = play({ abandoned: true, milestone: "Boss 4" });
+    expect(outcomeSummary(abandoned, ["Ida"], en)).toBe("Abandoned");
+    expect(outcomeSummary(abandoned, ["Ida"], da)).toBe("Afbrudt");
   });
 });

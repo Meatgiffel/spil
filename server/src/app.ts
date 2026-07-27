@@ -35,7 +35,7 @@ app.use("/uploads", express.static(env.UPLOADS_DIR, { maxAge: "1d", fallthrough:
 
 // Terminal 404 for alt under /api der ikke matchede en rute ovenfor.
 app.use("/api", (_req, _res, next: NextFunction) => {
-  next(new HttpError(404, "Endpointet findes ikke."));
+  next(new HttpError(404, "not_found"));
 });
 
 app.use((error: unknown, _req: Request, res: Response, next: NextFunction) => {
@@ -48,5 +48,5 @@ app.use((error: unknown, _req: Request, res: Response, next: NextFunction) => {
     return;
   }
   console.error("Uventet fejl:", error);
-  sendError(res, new HttpError(500, "Der gik noget galt."));
+  sendError(res, new HttpError(500, "unknown"));
 });

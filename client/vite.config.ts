@@ -9,10 +9,10 @@ export default defineConfig({
       registerType: "prompt",
       includeAssets: ["favicon.svg"],
       manifest: {
-        name: "Spil — brætspilshistorik",
+        name: "Spil — board game history",
         short_name: "Spil",
-        description: "Hold styr på hvilke brætspil I har spillet.",
-        lang: "da",
+        description: "Keep track of which board games you have played.",
+        lang: "en",
         start_url: "/",
         scope: "/",
         display: "standalone",

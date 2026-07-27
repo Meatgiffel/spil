@@ -94,11 +94,9 @@ export function revokeInviteKey(id: string): void {
     .where(and(eq(inviteKey.id, id), isNull(inviteKey.revokedAt)))
     .run();
   if (result.changes === 0) {
-    throw notFound("Invitationsnøglen findes ikke eller er allerede tilbagekaldt.");
+    throw notFound("invite_key_invalid");
   }
 }
-
-const INVALID_KEY_MESSAGE = "Invitationsnøglen er ikke gyldig.";
 
 /**
  * Forbruger nøglen atomisk. Betingelserne står i WHERE-delen, så to samtidige
@@ -128,7 +126,7 @@ export function consumeInviteKey(key: string): string {
     .run();
 
   if (result.changes === 0) {
-    throw badRequest(INVALID_KEY_MESSAGE, { inviteKey: INVALID_KEY_MESSAGE });
+    throw badRequest("invite_key_invalid", { inviteKey: "invite_key_invalid" });
   }
 
   const row = db
@@ -138,7 +136,7 @@ export function consumeInviteKey(key: string): string {
     .get();
 
   if (!row) {
-    throw badRequest(INVALID_KEY_MESSAGE, { inviteKey: INVALID_KEY_MESSAGE });
+    throw badRequest("invite_key_invalid", { inviteKey: "invite_key_invalid" });
   }
   return row.id;
 }

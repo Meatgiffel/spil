@@ -2,10 +2,11 @@ import { useLiveQuery } from "dexie-react-hooks";
 import { useParams } from "react-router";
 import { Empty, Loading, ScreenHead } from "../components.js";
 import { getGroup, groupStats } from "../db/queries.js";
-import { plural } from "../format.js";
+import { useT } from "../i18n/index.js";
 
 export function StatsScreen() {
   const { groupId = "" } = useParams();
+  const t = useT();
 
   const data = useLiveQuery(async () => {
     const group = await getGroup(groupId);
@@ -16,7 +17,7 @@ export function StatsScreen() {
   if (data === undefined) {
     return (
       <main className="screen">
-        <ScreenHead title="Statistik" back />
+        <ScreenHead title={t("stats.title")} back />
         <div className="screen-body">
           <Loading />
         </div>
@@ -27,9 +28,9 @@ export function StatsScreen() {
   if (data === null) {
     return (
       <main className="screen">
-        <ScreenHead title="Statistik" back />
+        <ScreenHead title={t("stats.title")} back />
         <div className="screen-body">
-          <Empty title="Gruppen findes ikke" body="Den er måske blevet slettet." />
+          <Empty title={t("group.notFoundTitle")} body={t("group.notFoundBody")} />
         </div>
       </main>
     );
@@ -43,8 +44,8 @@ export function StatsScreen() {
         <ScreenHead title={group.name} back />
         <div className="screen-body">
           <Empty
-            title="Ingen tal endnu"
-            body="Registrer et par partier, så begynder det at blive interessant."
+            title={t("stats.emptyTitle")}
+            body={t("stats.emptyBody")}
           />
         </div>
       </main>
@@ -58,19 +59,19 @@ export function StatsScreen() {
       <ScreenHead
         title={group.name}
         back
-        right={plural(stats.totalPlays, "parti", "partier")}
+        right={t.count("home.playCount", stats.totalPlays)}
       />
 
       <div className="screen-body">
         <section className="stack">
-          <h2>Hvem vinder mest</h2>
+          <h2>{t("stats.whoWinsMost")}</h2>
           <div className="stack-tight">
             {stats.players.map((player) => (
               <div key={player.playerId} className="card card-flat">
                 <div className="spread">
                   <span className="name">{player.name}</span>
                   <span className="kicker">
-                    {player.wins} af {player.plays}
+                    {t("stats.outOf", { wins: player.wins, plays: player.plays })}
                   </span>
                 </div>
                 {/* Simpel andelsvisning — ingen graf, ingen ekstra afhængighed. */}
@@ -96,12 +97,12 @@ export function StatsScreen() {
         <hr className="rule" />
 
         <section className="stack">
-          <h2>Mest spillede</h2>
+          <h2>{t("stats.mostPlayed")}</h2>
           <div className="stack-tight">
             {stats.topGames.map((game) => (
               <div key={game.gameId} className="list-row">
                 <span className="name">{game.title}</span>
-                <span className="kicker">{plural(game.count, "gang", "gange")}</span>
+                <span className="kicker">{t.count("stats.timesPlayed", game.count)}</span>
               </div>
             ))}
           </div>

@@ -9,7 +9,7 @@ import { BggAuthError, bggIsConfigured, gameDetails, searchGames } from "../bgg.
 import { db } from "../db/client.js";
 import { game } from "../db/schema.js";
 import { env } from "../env.js";
-import { HttpError, badRequest, parseOrThrow } from "../http.js";
+import { HttpError, notFound, parseOrThrow } from "../http.js";
 import { requireUser } from "../session.js";
 import { allocateServerSeq } from "../sync.js";
 
@@ -38,17 +38,12 @@ gamesRouter.get("/search", async (req, res, next) => {
     if (error instanceof BggAuthError) {
       // Ikke en 503: ingen ventetid løser det, og "prøv igen om lidt" ville
       // sende brugeren i den forkerte retning.
-      next(new HttpError(501, error.message));
+      next(new HttpError(501, "bgg_not_configured", error.message));
       return;
     }
     // BGG er ustabilt. UI'et falder tilbage på manuel oprettelse, så det er
     // ikke en 500 — det er en besked om at den vej ikke virker lige nu.
-    next(
-      new HttpError(
-        503,
-        "BoardGameGeek svarer ikke lige nu. Opret spillet manuelt i stedet.",
-      ),
-    );
+    next(new HttpError(503, "bgg_unavailable"));
   }
 });
 
@@ -90,7 +85,7 @@ gamesRouter.post("/import", async (req, res, next) => {
     }
 
     const details = await gameDetails(bggId);
-    if (!details) throw badRequest("Spillet blev ikke fundet på BoardGameGeek.");
+    if (!details) throw notFound("not_found");
 
     const thumbnailPath = details.thumbnailUrl
       ? await downloadThumbnail(details.thumbnailUrl, bggId)
@@ -117,6 +112,10 @@ gamesRouter.post("/import", async (req, res, next) => {
 
     res.status(201).json({ game: row, alreadyExisted: false });
   } catch (error) {
-    next(error instanceof BggAuthError ? new HttpError(501, error.message) : error);
+    next(
+      error instanceof BggAuthError
+        ? new HttpError(501, "bgg_not_configured", error.message)
+        : error,
+    );
   }
 });

@@ -3,12 +3,14 @@ import { ApiError } from "../api.js";
 import { Field } from "../components.js";
 import { fetchAuthStatus, signIn, signUp } from "../auth-client.js";
 import { sync } from "../db/sync.js";
+import { translateError, useT } from "../i18n/index.js";
 import { useSession } from "../session.js";
 
 type Mode = "login" | "signup" | "setup";
 
 export function LoginScreen() {
   const { setUser } = useSession();
+  const t = useT();
   const [mode, setMode] = useState<Mode>("login");
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
@@ -54,10 +56,18 @@ export function LoginScreen() {
     } catch (error) {
       if (error instanceof ApiError) {
         // Brugerens indtastning bevares — felterne ryddes aldrig ved fejl.
-        setFields(error.fields ?? {});
-        setMessage(error.fields ? null : error.message);
+        // Serveren sender koder; teksten er kun fallback for ukendte koder.
+        setFields(
+          Object.fromEntries(
+            Object.entries(error.fields ?? {}).map(([field, code]) => [
+              field,
+              translateError(t, code, code),
+            ]),
+          ),
+        );
+        setMessage(error.fields ? null : translateError(t, error.code, error.message));
       } else {
-        setMessage("Der gik noget galt.");
+        setMessage(t("errors.unknown"));
       }
     } finally {
       setBusy(false);
@@ -71,25 +81,28 @@ export function LoginScreen() {
     <main className="screen">
       <header className="screen-head">
         <div className="screen-head-row">
-          <span className="screen-title">Spil</span>
-          <span className="kicker">{isSetup ? "Opsætning" : isLogin ? "Log ind" : "Ny konto"}</span>
+          <span className="screen-title">{t("app.name")}</span>
+          <span className="kicker">
+            {isSetup
+              ? t("login.setupTitle")
+              : isLogin
+                ? t("login.title")
+                : t("login.signUpTitle")}
+          </span>
         </div>
       </header>
 
       <form className="screen-body" onSubmit={submit} noValidate>
         {isSetup && (
           <div className="stack-tight">
-            <h1>Velkommen. Der er ingen her endnu.</h1>
-            <p className="lede">
-              Den første konto bliver administrator og kan udstede invitationsnøgler
-              til resten.
-            </p>
+            <h1>{t("login.setupHeading")}</h1>
+            <p className="lede">{t("login.setupLede")}</p>
           </div>
         )}
 
-        {!isSetup && <h1>{isLogin ? "Log ind" : "Opret konto"}</h1>}
+        {!isSetup && <h1>{isLogin ? t("login.title") : t("login.signUpTitle")}</h1>}
 
-        <Field label="E-mail" error={fields.email}>
+        <Field label={t("login.email")} error={fields.email}>
           <input
             className="input"
             type="email"
@@ -104,7 +117,7 @@ export function LoginScreen() {
         </Field>
 
         {!isLogin && (
-          <Field label="Navn" error={fields.name}>
+          <Field label={t("login.name")} error={fields.name}>
             <input
               className="input"
               autoComplete="name"
@@ -116,7 +129,7 @@ export function LoginScreen() {
           </Field>
         )}
 
-        <Field label="Kodeord" error={fields.password}>
+        <Field label={t("login.password")} error={fields.password}>
           <input
             className="input"
             type="password"
@@ -130,9 +143,9 @@ export function LoginScreen() {
 
         {mode === "signup" && (
           <Field
-            label="Invitationsnøgle"
+            label={t("login.inviteKey")}
             error={fields.inviteKey}
-            hint="Spil er lukket for fremmede. Du får en nøgle af den der inviterer dig."
+            hint={t("login.inviteKeyHint")}
           >
             <input
               className="input input-key"
@@ -151,7 +164,13 @@ export function LoginScreen() {
         {message && <p className="field-error">{message}</p>}
 
         <button className="btn btn-primary btn-block" type="submit" disabled={busy}>
-          {busy ? "Henter dine data…" : isSetup ? "Opret administrator" : isLogin ? "Log ind" : "Opret konto"}
+          {busy
+            ? t("login.fetching")
+            : isSetup
+              ? t("login.createAdmin")
+              : isLogin
+                ? t("login.title")
+                : t("login.signUpTitle")}
         </button>
 
         {!isSetup && (
@@ -164,7 +183,7 @@ export function LoginScreen() {
               setMessage(null);
             }}
           >
-            {isLogin ? "Jeg har en invitationsnøgle" : "Jeg har allerede en konto"}
+            {isLogin ? t("login.haveKey") : t("login.haveAccount")}
           </button>
         )}
       </form>

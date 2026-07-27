@@ -3,6 +3,7 @@ import { NavLink, Navigate, Route, Routes, useLocation } from "react-router";
 import { useRegisterSW } from "virtual:pwa-register/react";
 import { Loading } from "./components.js";
 import { dismissRejections, startSyncLoop, sync } from "./db/sync.js";
+import { useT } from "./i18n/index.js";
 import { useSession, useSyncStatus } from "./session.js";
 import { GamesScreen } from "./routes/Games.js";
 import { GroupScreen } from "./routes/Group.js";
@@ -16,6 +17,7 @@ import { ProfileScreen } from "./routes/Profile.js";
 import { StatsScreen } from "./routes/Stats.js";
 
 function UpdateBanner() {
+  const t = useT();
   const {
     needRefresh: [needRefresh],
     updateServiceWorker,
@@ -24,28 +26,25 @@ function UpdateBanner() {
   if (!needRefresh) return null;
   return (
     <div className="banner banner-accent">
-      <span className="grow">Ny version klar.</span>
+      <span className="grow">{t("banner.updateReady")}</span>
       <button type="button" onClick={() => void updateServiceWorker(true)}>
-        Genindlæs
+        {t("banner.reload")}
       </button>
     </div>
   );
 }
 
 function SyncBanner() {
+  const t = useT();
   const status = useSyncStatus();
   const { setUser } = useSession();
 
   if (status.rejected > 0) {
     return (
       <div className="banner banner-accent">
-        <span className="grow">
-          {status.rejected === 1
-            ? "1 ændring blev afvist af serveren."
-            : `${status.rejected} ændringer blev afvist af serveren.`}
-        </span>
+        <span className="grow">{t.count("banner.rejected", status.rejected)}</span>
         <button type="button" onClick={() => void dismissRejections()}>
-          OK
+          {t("action.ok")}
         </button>
       </div>
     );
@@ -54,9 +53,9 @@ function SyncBanner() {
   if (status.state === "needsReauth") {
     return (
       <div className="banner banner-accent">
-        <span className="grow">Din session er udløbet.</span>
+        <span className="grow">{t("banner.sessionExpired")}</span>
         <button type="button" onClick={() => setUser(null)}>
-          Log ind
+          {t("banner.signIn")}
         </button>
       </div>
     );
@@ -65,8 +64,10 @@ function SyncBanner() {
   if (status.state === "offline") {
     return (
       <div className="banner">
-        <span className="grow">Offline — alt du laver bliver gemt.</span>
-        {status.pending > 0 && <span className="kicker">{status.pending} i kø</span>}
+        <span className="grow">{t("banner.offline")}</span>
+        {status.pending > 0 && (
+          <span className="kicker">{t("banner.queued", { count: status.pending })}</span>
+        )}
       </div>
     );
   }
@@ -74,7 +75,7 @@ function SyncBanner() {
   if (status.pending > 0) {
     return (
       <div className="banner">
-        <span className="grow">{status.pending} ændringer sendes…</span>
+        <span className="grow">{t("banner.sending", { count: status.pending })}</span>
       </div>
     );
   }
@@ -83,14 +84,15 @@ function SyncBanner() {
 }
 
 function TabBar() {
+  const t = useT();
   const tabs = [
-    { to: "/", label: "Hjem" },
-    { to: "/grupper", label: "Grupper" },
-    { to: "/spil", label: "Spil" },
-    { to: "/profil", label: "Profil" },
+    { to: "/", label: t("nav.home") },
+    { to: "/groups", label: t("nav.groups") },
+    { to: "/games", label: t("nav.games") },
+    { to: "/profile", label: t("nav.profile") },
   ];
   return (
-    <nav className="tabbar" aria-label="Hovedmenu">
+    <nav className="tabbar" aria-label={t("nav.menu")}>
       {tabs.map((tab) => (
         <NavLink key={tab.to} to={tab.to} end={tab.to === "/"} className="tab">
           {({ isActive }) => (
@@ -145,7 +147,7 @@ export function App() {
   }
 
   // Registreringsflowet fylder skærmen selv og skal ikke have bundnavigation.
-  const fullscreen = location.pathname.startsWith("/nyt-parti");
+  const fullscreen = location.pathname.startsWith("/plays/new");
 
   return (
     <div className="app">
@@ -153,15 +155,15 @@ export function App() {
       <SyncBanner />
       <Routes>
         <Route path="/" element={<HomeScreen />} />
-        <Route path="/grupper" element={<GroupsScreen />} />
-        <Route path="/grupper/:groupId" element={<GroupScreen />} />
-        <Route path="/grupper/:groupId/statistik" element={<StatsScreen />} />
-        <Route path="/nyt-parti" element={<NewPlayScreen />} />
-        <Route path="/nyt-parti/:groupId" element={<NewPlayScreen />} />
-        <Route path="/partier/:playId" element={<PlayScreen />} />
-        <Route path="/spil" element={<GamesScreen />} />
-        <Route path="/profil" element={<ProfileScreen />} />
-        <Route path="/noegler" element={<InvitesScreen />} />
+        <Route path="/groups" element={<GroupsScreen />} />
+        <Route path="/groups/:groupId" element={<GroupScreen />} />
+        <Route path="/groups/:groupId/stats" element={<StatsScreen />} />
+        <Route path="/plays/new" element={<NewPlayScreen />} />
+        <Route path="/plays/new/:groupId" element={<NewPlayScreen />} />
+        <Route path="/plays/:playId" element={<PlayScreen />} />
+        <Route path="/games" element={<GamesScreen />} />
+        <Route path="/profile" element={<ProfileScreen />} />
+        <Route path="/invite-keys" element={<InvitesScreen />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       {!fullscreen && <TabBar />}

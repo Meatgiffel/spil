@@ -14,22 +14,22 @@ export const inviteKeySchema = z
   .string()
   .trim()
   .toLowerCase()
-  .regex(inviteKeyPattern, { error: "Invitationsnøglen har ikke det rigtige format." });
+  .regex(inviteKeyPattern, { error: "invite_key_format" });
 
 export const signUpSchema = z.object({
-  email: z.email({ error: "Indtast en gyldig e-mailadresse." }),
+  email: z.email({ error: "email_invalid" }),
   name: z
     .string()
     .trim()
-    .min(1, { error: "Navnet må ikke være tomt." })
-    .max(80, { error: "Navnet må højst være 80 tegn." }),
+    .min(1, { error: "name_required" })
+    .max(80, { error: "name_too_long" }),
   password: z
     .string()
     // Bevidst lavt og uden krav til tegntyper: appen er lukket bag en
     // invitationsnøgle, og login er rate-limitet til 10 forsøg pr. kvarter pr.
     // IP. Kravene skal matche server/src/auth.ts.
-    .min(6, { error: "Kodeordet skal være mindst 6 tegn." })
-    .max(200, { error: "Kodeordet må højst være 200 tegn." }),
+    .min(6, { error: "password_min" })
+    .max(200, { error: "password_max" }),
   inviteKey: inviteKeySchema,
 });
 

@@ -29,9 +29,24 @@ Intet UI-komponentbibliotek og ingen Tailwind — håndskrevet CSS med custom pr
 
 ## Konventioner
 
-**Sprog.** Al brugervendt tekst er på dansk — hold det sådan. `<html lang="da">`.
-Kode-identifikatorer er engelske, men **kommentarer skrives på dansk**, som i flagdag.
-Datoer via `Intl.DateTimeFormat("da-DK", …)`, sortering via `localeCompare(…, "da")`.
+**Sprog.** App'en findes på **engelsk og dansk**, med engelsk som standard.
+*Ændret 2026-07-27; den var oprindeligt kun dansk.*
+
+Ingen brugervendt tekst må stå direkte i en komponent. Alt går gennem
+`client/src/i18n/messages.ts`, hvor `en` er kilden og `da` er typet som
+`Record<MessageKey, string>` — glemmer man en oversættelse, fejler bygningen.
+Datoer, sortering og lister formateres efter det valgte sprog via `format.ts`
+og `Intl`; brug aldrig et hårdkodet locale.
+
+**Serverens fejl er koder, ikke prosa.** `HttpError` bærer en `ErrorCode` fra
+`shared/src/errors.ts`, og zod-skemaernes beskeder er også koder
+(`"password_min"`, ikke en sætning). Klienten oversætter dem og falder tilbage
+på serverens tekst for koder den ikke kender. Koder må aldrig skifte betydning
+— skal en formulering rettes, rettes oversættelsen.
+
+**URL'er er engelske:** `/groups`, `/plays/new`, `/games`, `/invite-keys`.
+
+Kode-identifikatorer er engelske, og **kommentarer skrives på dansk**, som i flagdag.
 CSV-eksport bruger `;` som separator, `\r\n` og UTF-8 BOM.
 
 **Stil.** 2 spaces, dobbelte anførselstegn, semikolon, ESM med navngivne eksporter.

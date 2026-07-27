@@ -174,6 +174,27 @@ sendes deres egen svartekst med, så man kan se forskel på udløbet, forkert og
 
 Cachen bruges også når tokenet mangler, så allerede hentede søgninger stadig virker.
 
+### To sprog, engelsk som standard
+
+*Tilføjet 2026-07-27. App'en var oprindeligt kun dansk.*
+
+Håndskrevet i18n frem for et bibliotek: ordbogen er ét objekt, `en` er kilden, og
+`da` er typet som `Record<MessageKey, string>`. Glemmer man en nøgle, fejler
+bygningen — det er den samme garanti et bibliotek ville give, uden afhængigheden
+og uden endnu et lag der skal kunne køre offline.
+
+**Sproget ligger i localStorage, ikke i IndexedDB.** To grunde. localStorage er
+synkront, så sproget er kendt allerede ved første render; med Dexie var der et
+glimt af engelsk, og et genindlæs lige efter et valg kunne nå at afbryde
+skrivningen — det blev fanget af e2e-testen. Og sproget hører til *enheden*, ikke
+kontoen: det skal overleve et log ud, hvor al lokal data ryddes.
+
+**Serverens fejl blev til koder.** `HttpError` bærer en `ErrorCode`, og
+zod-beskederne er koder frem for sætninger. Klienten oversætter og falder
+tilbage på serverens tekst for ukendte koder — det sker fx når serveren er nyere
+end den app der ligger i browserens cache. Alternativet, at serveren læser
+`Accept-Language`, ville sprede oversættelser ud over to kodebaser.
+
 ### Fotos går uden om outboxen
 
 En `photo`-række skal have en rigtig serversti i `file_path`, og den findes først efter uploaden.

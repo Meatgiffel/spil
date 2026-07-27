@@ -2,39 +2,44 @@ import { useLiveQuery } from "dexie-react-hooks";
 import { Link, useNavigate } from "react-router";
 import { Empty, Loading, PendingMark, ScreenHead } from "../components.js";
 import { listGroups, listPlays, summarisePlays } from "../db/queries.js";
-import { formatDay, formatDuration, plural } from "../format.js";
+import { formatDay, formatDuration } from "../format.js";
+import { useT } from "../i18n/index.js";
 
 export function HomeScreen() {
   const navigate = useNavigate();
+  const t = useT();
 
   const data = useLiveQuery(async () => {
     const [groups, plays] = await Promise.all([listGroups(), listPlays()]);
-    return { groups, plays: await summarisePlays(plays.slice(0, 50)) };
-  }, []);
+    return { groups, plays: await summarisePlays(plays.slice(0, 50), t) };
+  }, [t]);
 
   return (
     <main className="screen">
-      <ScreenHead title="Spil" right={data ? plural(data.plays.length, "parti", "partier") : ""} />
+      <ScreenHead
+        title={t("app.name")}
+        right={data ? t.count("home.playCount", data.plays.length) : ""}
+      />
 
       <div className="screen-body">
         <button
           className="btn btn-primary btn-block"
           type="button"
-          onClick={() => navigate("/nyt-parti")}
+          onClick={() => navigate("/plays/new")}
           disabled={data !== undefined && data.groups.length === 0}
         >
-          Registrer parti
+          {t("home.recordPlay")}
         </button>
 
         {data === undefined && <Loading />}
 
         {data && data.groups.length === 0 && (
           <Empty
-            title="Ingen grupper endnu"
-            body="En gruppe er de mennesker I plejer at spille med. Opret én for at komme i gang."
+            title={t("home.noGroupsTitle")}
+            body={t("home.noGroupsBody")}
             action={
-              <Link className="btn btn-secondary" to="/grupper">
-                Opret gruppe
+              <Link className="btn btn-secondary" to="/groups">
+                {t("home.createGroup")}
               </Link>
             }
           />
@@ -42,27 +47,27 @@ export function HomeScreen() {
 
         {data && data.groups.length > 0 && data.plays.length === 0 && (
           <Empty
-            title="Ingen partier endnu"
-            body="Når I har spillet noget, dukker det op her."
+            title={t("home.noPlaysTitle")}
+            body={t("home.noPlaysBody")}
           />
         )}
 
         {data && data.plays.length > 0 && (
           <section className="stack">
-            <h2>Seneste partier</h2>
+            <h2>{t("home.recentPlays")}</h2>
             {data.plays.map((play) => (
-              <Link key={play.id} className="card" to={`/partier/${play.id}`}>
+              <Link key={play.id} className="card" to={`/plays/${play.id}`}>
                 <span className="kicker">
-                  {formatDay(play.playedAt)} · {play.groupName}
+                  {formatDay(play.playedAt, t)} · {play.groupName}
                 </span>
                 <span className="card-title">{play.gameTitle}</span>
                 <span className="row">
                   <span className="lede grow">
                     {play.summary}
                     {play.participantCount > 0 &&
-                      ` · ${plural(play.participantCount, "spiller", "spillere")}`}
-                    {formatDuration(play.durationMinutes) &&
-                      ` · ${formatDuration(play.durationMinutes)}`}
+                      ` · ${t.count("group.playerCount", play.participantCount)}`}
+                    {formatDuration(play.durationMinutes, t) &&
+                      ` · ${formatDuration(play.durationMinutes, t)}`}
                   </span>
                   {play.pending && <PendingMark />}
                 </span>

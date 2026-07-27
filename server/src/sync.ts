@@ -109,11 +109,11 @@ const configs: Record<SyncTable, TableConfig> = {
     checkWrite({ userId, payload, existing }) {
       const claimed = payload.userId as string | null | undefined;
       if (claimed && claimed !== userId) {
-        throw forbidden("Du kan ikke knytte en spiller til en anden konto.");
+        throw forbidden("player_claims_other_account");
       }
       const owner = existing?.userId as string | null | undefined;
       if (owner && owner !== userId) {
-        throw forbidden("Spilleren tilhører en anden konto.");
+        throw forbidden("player_other_account");
       }
     },
     read: (id) => db.select().from(player).where(eq(player.id, id)).get(),
@@ -179,12 +179,12 @@ const configs: Record<SyncTable, TableConfig> = {
   groupMember: {
     checkWrite({ userId, payload, existing }) {
       const groupId = (payload.groupId ?? existing?.groupId) as string | undefined;
-      if (!groupId) throw forbidden("Medlemskabet mangler en gruppe.");
+      if (!groupId) throw forbidden("group_missing");
       if (isGroupMember(userId, groupId)) return;
       // Første medlem i en gruppe man selv lige har oprettet — typisk offline,
       // hvor gruppe og medlemskab kommer i samme push.
       if (groupMemberCount(groupId) === 0 && groupCreator(groupId) === userId) return;
-      throw forbidden("Du er ikke medlem af den gruppe.");
+      throw forbidden("not_group_member");
     },
     read: (id) => db.select().from(groupMember).where(eq(groupMember.id, id)).get(),
     upsert(id, payload, meta) {
@@ -248,7 +248,7 @@ const configs: Record<SyncTable, TableConfig> = {
   play: {
     checkWrite({ userId, payload, existing }) {
       const groupId = (payload.groupId ?? existing?.groupId) as string | undefined;
-      if (!groupId) throw forbidden("Partiet mangler en gruppe.");
+      if (!groupId) throw forbidden("group_missing");
       assertGroupAccess(userId, groupId);
     },
     read: (id) => db.select().from(play).where(eq(play.id, id)).get(),
@@ -292,9 +292,9 @@ const configs: Record<SyncTable, TableConfig> = {
   playParticipant: {
     checkWrite({ userId, payload, existing }) {
       const playId = (payload.playId ?? existing?.playId) as string | undefined;
-      if (!playId) throw forbidden("Deltageren mangler et parti.");
+      if (!playId) throw forbidden("play_missing");
       const groupId = playGroupId(playId);
-      if (!groupId) throw forbidden("Partiet findes ikke.");
+      if (!groupId) throw forbidden("play_not_found");
       assertGroupAccess(userId, groupId);
     },
     read: (id) =>
@@ -334,9 +334,9 @@ const configs: Record<SyncTable, TableConfig> = {
   photo: {
     checkWrite({ userId, payload, existing }) {
       const playId = (payload.playId ?? existing?.playId) as string | undefined;
-      if (!playId) throw forbidden("Billedet mangler et parti.");
+      if (!playId) throw forbidden("play_missing");
       const groupId = playGroupId(playId);
-      if (!groupId) throw forbidden("Partiet findes ikke.");
+      if (!groupId) throw forbidden("play_not_found");
       assertGroupAccess(userId, groupId);
     },
     read: (id) => db.select().from(photo).where(eq(photo.id, id)).get(),

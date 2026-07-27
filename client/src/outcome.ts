@@ -1,5 +1,7 @@
 import type { OutcomeType } from "@spil/shared";
 import type { LocalPlay, LocalPlayParticipant } from "./db/local.js";
+import { formatSeconds } from "./format.js";
+import type { MessageKey, Translate } from "./i18n/index.js";
 
 /**
  * Hvem vandt et parti.
@@ -8,21 +10,11 @@ import type { LocalPlay, LocalPlayParticipant } from "./db/local.js";
  * statistik. Den skal kun findes her, ellers begynder de tre at være uenige.
  */
 
-export const OUTCOME_LABELS: Record<OutcomeType, string> = {
-  ranking: "Placeringer",
-  score: "Point",
-  coop: "Samarbejde",
-  teams: "Hold",
-  solo: "Solo",
-};
+export const outcomeLabelKey = (type: OutcomeType): MessageKey =>
+  `outcome.${type}` as MessageKey;
 
-export const OUTCOME_HINTS: Record<OutcomeType, string> = {
-  ranking: "Tryk spillerne i den rækkefølge de endte.",
-  score: "Skriv point ind. Placeringerne regnes ud automatisk.",
-  coop: "I spiller sammen mod spillet. Alle vinder eller taber samlet.",
-  teams: "Sæt spillerne på hold og vælg hvilket hold der vandt.",
-  solo: "Ét menneske mod spillet.",
-};
+export const outcomeHintKey = (type: OutcomeType): MessageKey =>
+  `outcome.hint.${type}` as MessageKey;
 
 /** Laveste placeringstal blandt deltagerne, eller null hvis ingen er placeret. */
 export function bestPlacement(
@@ -94,51 +86,59 @@ export function placementsFromScores(
 export function outcomeSummary(
   play: Pick<
     LocalPlay,
-    "outcomeType" | "coopResult" | "winningTeam" | "abandoned" | "milestone" | "timeRemainingSeconds"
+    | "outcomeType"
+    | "coopResult"
+    | "winningTeam"
+    | "abandoned"
+    | "milestone"
+    | "timeRemainingSeconds"
   >,
   winnerNames: string[],
+  t: Translate,
 ): string {
-  if (play.abandoned) return "Afbrudt";
+  if (play.abandoned) return t("outcome.abandoned");
 
   const parts: string[] = [];
 
   switch (play.outcomeType) {
     case "coop":
-    case "solo":
+    case "solo": {
+      const solo = play.outcomeType === "solo";
       parts.push(
         play.coopResult === "won"
-          ? play.outcomeType === "solo"
-            ? "Vundet"
-            : "Alle vandt"
+          ? t(solo ? "outcome.soloWon" : "outcome.everyoneWon")
           : play.coopResult === "lost"
-            ? play.outcomeType === "solo"
-              ? "Tabt"
-              : "Alle tabte"
-            : "Intet resultat",
+            ? t(solo ? "outcome.soloLost" : "outcome.everyoneLost")
+            : t("outcome.noResult"),
       );
       break;
+    }
     case "teams":
-      parts.push(play.winningTeam ? `${play.winningTeam} vandt` : "Intet hold noteret");
+      parts.push(
+        play.winningTeam
+          ? t("outcome.teamWon", { team: play.winningTeam })
+          : t("outcome.noTeam"),
+      );
       break;
     default:
       parts.push(
         winnerNames.length > 0
-          ? `${winnerNames.join(" og ")} vandt`
-          : "Ingen vinder noteret",
+          ? t("outcome.playersWon", { names: joinNames(winnerNames, t) })
+          : t("outcome.noWinner"),
       );
   }
 
   if (play.milestone) parts.push(play.milestone);
   if (play.timeRemainingSeconds !== null) {
-    parts.push(`${formatSeconds(play.timeRemainingSeconds)} tilbage`);
+    parts.push(t("outcome.timeLeft", { time: formatSeconds(play.timeRemainingSeconds, t) }));
   }
 
   return parts.join(" · ");
 }
 
-export function formatSeconds(seconds: number): string {
-  if (seconds < 60) return `${seconds} sek.`;
-  const minutes = Math.floor(seconds / 60);
-  const rest = seconds % 60;
-  return rest === 0 ? `${minutes} min.` : `${minutes} min. ${rest} sek.`;
+/** "Ida og Sofie" / "Ida and Sofie". Intl klarer sprogforskellen. */
+function joinNames(names: string[], t: Translate): string {
+  return new Intl.ListFormat(t.locale, { style: "long", type: "conjunction" }).format(
+    names,
+  );
 }

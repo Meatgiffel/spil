@@ -5,7 +5,7 @@ import {
   type MutationResult,
   type SyncTable,
 } from "@spil/shared";
-import { NotLoggedInError, post } from "../api.js";
+import { ApiError, NotLoggedInError, post } from "../api.js";
 import {
   CURSOR_KEY,
   SESSION_KEY,
@@ -113,7 +113,7 @@ async function pushOnce(): Promise<boolean> {
             opId: entry.opId,
             table: entry.table,
             id: entry.id,
-            message: entry.lastError ?? "Ændringen blev afvist.",
+            message: entry.lastError ?? "unknown",
             at: Date.now(),
           })),
         );
@@ -180,7 +180,7 @@ async function uploadPendingPhotos(user: CurrentUser): Promise<void> {
             opId: entry.id,
             table: "photo",
             id: entry.id,
-            message: "Billedet blev afvist af serveren.",
+            message: "photo_rejected",
             at: Date.now(),
           });
         });
@@ -268,7 +268,7 @@ export function sync(): Promise<void> {
       if (error instanceof NotLoggedInError) {
         // Lokal data bliver liggende og kan stadig redigeres — kun serveren er utilgængelig.
         await setStatus({ state: "needsReauth" });
-      } else if (error instanceof Error && error.message === "Ingen forbindelse.") {
+      } else if (error instanceof ApiError && error.code === "no_connection") {
         await setStatus({ state: "offline" });
       } else {
         // Uventede fejl skal kunne ses. Uden det her forsvinder fx en

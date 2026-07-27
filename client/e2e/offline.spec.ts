@@ -12,52 +12,57 @@ const EMAIL = "casper@example.com";
 
 async function opretAdministrator(page: Page) {
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: /ingen her endnu/i })).toBeVisible();
-  await page.getByLabel("E-mail").fill(EMAIL);
-  await page.getByLabel("Navn").fill("Casper");
-  await page.getByLabel("Kodeord").fill(KODEORD);
-  await page.getByRole("button", { name: "Opret administrator" }).click();
-  await expect(page.getByRole("button", { name: "Registrer parti" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /nobody is here yet/i })).toBeVisible();
+  await page.getByLabel("Email").fill(EMAIL);
+  await page.getByLabel("Name").fill("Casper");
+  await page.getByLabel("Password").fill(KODEORD);
+  await page.getByRole("button", { name: "Create administrator" }).click();
+  await expect(page.getByRole("button", { name: "Record play" })).toBeVisible();
 }
 
 async function logInd(page: Page) {
   await page.goto("/");
-  await page.getByLabel("E-mail").fill(EMAIL);
-  await page.getByLabel("Kodeord").fill(KODEORD);
-  await page.getByRole("button", { name: "Log ind", exact: true }).click();
+  await page.getByLabel("Email").fill(EMAIL);
+  await page.getByLabel("Password").fill(KODEORD);
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
 }
 
 async function opretGruppe(page: Page, navn: string) {
-  await page.getByRole("link", { name: "Grupper" }).click();
-  await page.getByRole("button", { name: "Ny gruppe" }).click();
-  await page.getByLabel("Navn på gruppen").fill(navn);
-  await page.getByRole("button", { name: "Opret", exact: true }).click();
+  await page.getByRole("link", { name: "Groups" }).click();
+  await page.getByRole("button", { name: "New group" }).click();
+  await page.getByLabel("Group name").fill(navn);
+  await page.getByRole("button", { name: "Create", exact: true }).click();
   await expect(page.getByRole("link", { name: new RegExp(navn) })).toBeVisible();
 }
 
 /** Kører hele registreringsflowet igennem: spil → hvem → placeringer → detaljer. */
 async function registrerParti(page: Page, spil: string) {
-  await page.getByRole("link", { name: "Hjem" }).click();
-  await page.getByRole("button", { name: "Registrer parti" }).click();
+  await page.getByRole("link", { name: "Home" }).click();
+  await page.getByRole("button", { name: "Record play" }).click();
 
   // Trin 0: vælg gruppe. Listen kommer fra IndexedDB, så den skal ventes ind.
-  await expect(page.getByRole("heading", { name: "Hvilken gruppe?" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Which group?" })).toBeVisible();
   await page.getByRole("button", { name: /Spilklubben/ }).click();
 
-  await page.getByLabel("Søg i biblioteket").fill(spil);
-  await page.getByRole("button", { name: new RegExp(`Opret .${spil}`) }).click();
+  await page.getByLabel("Search the library").fill(spil);
+  await page.getByRole("button", { name: new RegExp(`Create .${spil}`) }).click();
 
   await page.getByRole("button", { name: /Casper/ }).click();
-  await page.getByRole("button", { name: /Videre · 1 spiller/ }).click();
+  await page.getByRole("button", { name: /Next · 1 player/ }).click();
 
   // Placeringer: ét tryk gør Casper til vinder.
   await page.getByRole("button", { name: /Casper/ }).click();
-  await expect(page.getByRole("button", { name: /Casper VINDER/ })).toBeVisible();
-  await page.getByRole("button", { name: "Videre" }).click();
+  await expect(page.getByRole("button", { name: /Casper WINNER/ })).toBeVisible();
+  await page.getByRole("button", { name: "Next", exact: true }).click();
 
-  await page.getByRole("button", { name: "Gem parti" }).click();
+  await page.getByRole("button", { name: "Save play" }).click();
   await expect(page.getByRole("heading", { name: spil })).toBeVisible();
 }
+
+// Serielt og i denne rækkefølge: begge tests deler den samme server og
+// database, og den første opretter den administrator den anden logger ind som.
+// Uden serial ville rækkefølgen være tilfældig — og testen dermed flaky.
+test.describe.configure({ mode: "serial" });
 
 test("et parti oprettet offline dukker op på en anden enhed", async ({ browser }) => {
   const enhedA = await browser.newContext();
@@ -74,9 +79,9 @@ test("et parti oprettet offline dukker op på en anden enhed", async ({ browser 
   await registrerParti(sideA, "Vingespil");
 
   // Partiet er synligt med det samme, og markeret som ikke-sendt.
-  await sideA.getByRole("link", { name: "Hjem" }).click();
+  await sideA.getByRole("link", { name: "Home" }).click();
   await expect(sideA.getByText("Vingespil")).toBeVisible();
-  await expect(sideA.getByText("Gemmes senere").first()).toBeVisible();
+  await expect(sideA.getByText("Saved later").first()).toBeVisible();
 
   // App'en skal også kunne genindlæses uden net — det er hele pointen med PWA'en.
   await sideA.reload();
@@ -86,7 +91,7 @@ test("et parti oprettet offline dukker op på en anden enhed", async ({ browser 
   await enhedA.setOffline(false);
 
   // Køen skal tømmes af sig selv.
-  await expect(sideA.getByText("Gemmes senere")).toHaveCount(0, { timeout: 30_000 });
+  await expect(sideA.getByText("Saved later")).toHaveCount(0, { timeout: 30_000 });
 
   // ── En anden enhed ─────────────────────────────────────────────────────
   const enhedB = await browser.newContext();
@@ -94,8 +99,35 @@ test("et parti oprettet offline dukker op på en anden enhed", async ({ browser 
   await logInd(sideB);
 
   await expect(sideB.getByText("Vingespil")).toBeVisible({ timeout: 30_000 });
-  await expect(sideB.getByText(/Casper vandt/)).toBeVisible();
+  await expect(sideB.getByText(/Casper won/)).toBeVisible();
 
   await enhedA.close();
   await enhedB.close();
+});
+
+test("sproget kan skiftes og huskes på tværs af genindlæsninger", async ({ browser }) => {
+  const ctx = await browser.newContext();
+  const page = await ctx.newPage();
+
+  await logInd(page);
+
+  // App'en starter på engelsk.
+  await expect(page.getByRole("link", { name: "Groups" })).toBeVisible();
+  expect(await page.locator("html").getAttribute("lang")).toBe("en");
+
+  await page.getByRole("link", { name: "Profile" }).click();
+  await page.getByRole("button", { name: "Dansk" }).click();
+
+  // Hele appen skifter med det samme, ikke først ved næste indlæsning.
+  await expect(page.getByRole("link", { name: "Grupper" })).toBeVisible();
+  expect(await page.locator("html").getAttribute("lang")).toBe("da");
+
+  // Valget ligger i IndexedDB, så det holder også uden net.
+  await page.reload();
+  await expect(page.getByRole("link", { name: "Grupper" })).toBeVisible({
+    timeout: 15_000,
+  });
+  expect(await page.locator("html").getAttribute("lang")).toBe("da");
+
+  await ctx.close();
 });

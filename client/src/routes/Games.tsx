@@ -5,12 +5,13 @@ import { Empty, Field, Loading, PendingMark, ScreenHead } from "../components.js
 import { mutate } from "../db/local.js";
 import { listGames } from "../db/queries.js";
 import { sync } from "../db/sync.js";
-import { plural } from "../format.js";
+import { useT } from "../i18n/index.js";
 import { useUser } from "../session.js";
 import { BggSearch } from "./BggSearch.js";
 
 export function GamesScreen() {
   const user = useUser();
+  const t = useT();
   const [title, setTitle] = useState("");
   const [open, setOpen] = useState(false);
 
@@ -41,8 +42,8 @@ export function GamesScreen() {
   return (
     <main className="screen">
       <ScreenHead
-        title="Spil"
-        right={games ? plural(games.length, "titel", "titler") : ""}
+        title={t("games.title")}
+        right={games ? t.count("games.titleCount", games.length) : ""}
       />
 
       <div className="screen-body">
@@ -50,7 +51,7 @@ export function GamesScreen() {
 
         {open ? (
           <form className="stack" onSubmit={createGame}>
-            <Field label="Titel">
+            <Field label={t("games.gameTitle")}>
               <input
                 className="input"
                 autoFocus
@@ -61,14 +62,14 @@ export function GamesScreen() {
             </Field>
             <div className="row">
               <button className="btn btn-primary grow" type="submit" disabled={!title.trim()}>
-                Opret
+                {t("action.create")}
               </button>
               <button
                 className="btn btn-secondary"
                 type="button"
                 onClick={() => setOpen(false)}
               >
-                Fortryd
+                {t("action.cancel")}
               </button>
             </div>
           </form>
@@ -78,7 +79,7 @@ export function GamesScreen() {
             type="button"
             onClick={() => setOpen(true)}
           >
-            Opret spil manuelt
+            {t("games.createManually")}
           </button>
         )}
 
@@ -86,8 +87,8 @@ export function GamesScreen() {
 
         {games?.length === 0 && (
           <Empty
-            title="Biblioteket er tomt"
-            body="Søg i BoardGameGeek eller opret en titel selv. Biblioteket deles af alle på installationen."
+            title={t("games.emptyTitle")}
+            body={t("games.emptyBody")}
           />
         )}
 

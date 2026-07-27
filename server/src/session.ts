@@ -58,7 +58,7 @@ export function requireAdmin(
   next: NextFunction,
 ): void {
   if (req.user?.role !== "admin") {
-    next(forbidden("Kræver en administratorkonto."));
+    next(forbidden("admin_required"));
     return;
   }
   next();

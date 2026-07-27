@@ -1,7 +1,10 @@
 export class ApiError extends Error {
   constructor(
     readonly status: number,
+    /** Stabil fejlkode fra serveren. Klienten oversætter den. */
+    readonly code: string,
     message: string,
+    /** Feltnavn → fejlkode. */
     readonly fields?: Record<string, string>,
   ) {
     super(message);
@@ -11,13 +14,15 @@ export class ApiError extends Error {
 
 /** Sat når serveren har svaret 401. Blokerer ikke lokal læsning eller skrivning. */
 export class NotLoggedInError extends ApiError {
-  constructor(message = "Din session er udløbet.") {
-    super(401, message);
+  constructor(message = "Session expired.") {
+    super(401, "session_expired", message);
     this.name = "NotLoggedInError";
   }
 }
 
-type ErrorBody = { error?: { message?: string; fields?: Record<string, string> } };
+type ErrorBody = {
+  error?: { code?: string; message?: string; fields?: Record<string, string> };
+};
 
 export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   let response: Response;
@@ -32,7 +37,7 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
     });
   } catch {
     // Netværksfejl er den normale tilstand i en offline-first app, ikke en undtagelse.
-    throw new ApiError(0, "Ingen forbindelse.");
+    throw new ApiError(0, "no_connection", "No connection.");
   }
 
   const text = await response.text();
@@ -40,9 +45,10 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
 
   if (!response.ok) {
     const errorBody = body as ErrorBody | null;
-    const message = errorBody?.error?.message ?? "Der gik noget galt.";
+    const code = errorBody?.error?.code ?? "unknown";
+    const message = errorBody?.error?.message ?? "Something went wrong.";
     if (response.status === 401) throw new NotLoggedInError(message);
-    throw new ApiError(response.status, message, errorBody?.error?.fields);
+    throw new ApiError(response.status, code, message, errorBody?.error?.fields);
   }
 
   return body as T;

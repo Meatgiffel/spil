@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ApiError, api, post } from "../api.js";
 import { Field } from "../components.js";
+import { translateError, useT } from "../i18n/index.js";
 import { sync } from "../db/sync.js";
 
 type Hit = { bggId: number; title: string; year: number | null };
@@ -13,6 +14,7 @@ type Hit = { bggId: number; title: string; year: number | null };
  * valgfri: fejler den, siger den det og lader brugeren oprette spillet manuelt.
  */
 export function BggSearch() {
+  const t = useT();
   const [query, setQuery] = useState("");
   const [hits, setHits] = useState<Hit[] | null>(null);
   const [state, setState] = useState<"idle" | "searching" | "error">("idle");
@@ -50,11 +52,11 @@ export function BggSearch() {
           setState("error");
           setHits(null);
           setMessage(
-            error instanceof ApiError && error.status === 0
-              ? "Søgning kræver forbindelse."
-              : error instanceof ApiError
-                ? error.message
-                : "Kunne ikke søge.",
+            error instanceof ApiError
+              ? error.status === 0
+                ? t("bgg.needsConnection")
+                : translateError(t, error.code, error.message)
+              : t("errors.unknown"),
           );
         });
     }, 400);
@@ -74,7 +76,11 @@ export function BggSearch() {
       // Spillet er oprettet på serveren — næste pull henter det ned.
       void sync();
     } catch (error) {
-      setMessage(error instanceof ApiError ? error.message : "Kunne ikke hente spillet.");
+      setMessage(
+        error instanceof ApiError
+          ? translateError(t, error.code, error.message)
+          : t("errors.unknown"),
+      );
     } finally {
       setImporting(null);
     }
@@ -82,29 +88,26 @@ export function BggSearch() {
 
   if (configured === false) {
     return (
-      <p className="lede">
-        BoardGameGeek-opslag er ikke sat op på denne server — der mangler et
-        API-token. Opret spil manuelt i stedet.
-      </p>
+      <p className="lede">{t("bgg.notConfigured")}</p>
     );
   }
 
   return (
     <section className="stack">
-      <Field label="Søg på BoardGameGeek">
+      <Field label={t("bgg.search")}>
         <input
           className="input"
           value={query}
-          placeholder="Fx Vingespil"
+          placeholder={t("bgg.placeholder")}
           onChange={(event) => setQuery(event.target.value)}
         />
       </Field>
 
-      {state === "searching" && <span className="lede">Søger…</span>}
+      {state === "searching" && <span className="lede">{t("bgg.searching")}</span>}
       {message && <span className="field-error">{message}</span>}
 
       {hits?.length === 0 && state === "idle" && (
-        <span className="lede">Ingen træffere. Opret spillet manuelt i stedet.</span>
+        <span className="lede">{t("bgg.noHits")}</span>
       )}
 
       {hits && hits.length > 0 && (
@@ -120,7 +123,7 @@ export function BggSearch() {
               <span className="name">{hit.title}</span>
               {hit.year && <span className="kicker">{hit.year}</span>}
               <span className="kicker" style={{ color: "var(--accent)" }}>
-                {importing === hit.bggId ? "HENTER" : "TILFØJ"}
+                {importing === hit.bggId ? t("bgg.fetching") : t("bgg.add")}
               </span>
             </button>
           ))}
