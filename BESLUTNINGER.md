@@ -225,10 +225,49 @@ droppet — appen skal kunne bygges og køre offline, og en blokerende ekstern f
 det første der fejlede i en LXC uden udgående adgang. Systemets font-stack bruges i stedet, præcis
 som designets egne skærme gør.
 
+### Gæst → konto er en sammenlægning, ikke et felt
+
+*Tilføjet 2026-07-27. Stod tidligere som et åbent punkt.*
+
+Hver konto får sin egen spiller ved oprettelse, og der er et unikt indeks på `user_id`. Koblingen
+kan derfor ikke være "sæt `user_id` på gæsten" — det ville give kontoen to spillere. Den er en
+sammenlægning: gæstens partier og medlemskaber flyttes over på kontoens spiller, og gæsten
+soft-slettes.
+
+**Går bevidst uden om sync.** Den kræver begge spilleres fulde historik og skal være atomisk, og
+ingen af delene kan lade sig gøre på en offline klient. Derfor `POST /api/players/:id/link`.
+
+To detaljer der ikke er valgfrie:
+
+- **Gæstens medlemskab soft-slettes; kontoen får en ny række.** Flyttede man rækken i stedet, ville
+  intet længere pege på gæsten — og da pull viser en spiller til dem der deler gruppe med
+  vedkommende *via* `group_member`, ville sletningen af gæsten aldrig nå ud. Klienterne ville
+  beholde en død spiller for evigt. Det blev fanget af testen "flytter gæstens partier og
+  medlemskab over på kontoen".
+- **Var begge med i samme parti**, beholdes kontoens deltagerrække og gæstens soft-slettes. Det
+  unikke indeks på `(play_id, player_id)` tillader ikke to.
+
+Man skal være medlem af **alle** de grupper gæsten er med i. Ellers kunne et medlem af én gruppe
+omskrive historik i en anden.
+
+### Kontolisten går uden om sync
+
+`GET /api/players/accounts` viser alle konti. En spiller synkroniseres først når man deler gruppe,
+men man skal netop kunne finde nogen man *ikke* deler gruppe med endnu for at tilføje dem — det er
+en hønen-og-ægget-situation sync ikke kan løse.
+
+Installationen er lukket bag invitationsnøgler, så navn og e-mail er ikke oplysninger der skal
+skjules for dem der allerede er lukket ind.
+
+### Alle medlemmer styrer gruppen
+
+Der er ingen rolleforskel i praksis: ethvert medlem kan tilføje, rette og slette i gruppen.
+`group_member.role` findes i skemaet og sættes til `owner` for opretteren, men bruges ikke til
+adgangskontrol. Det er et bevidst valg for en app til en vennekreds — ikke en forglemmelse.
+
 ## Åbne punkter
 
 - CT-nummer og host-node til den nye LXC er ikke besluttet endeligt. `CT 130 "spil"` er forslaget;
   `balder` (192.168.50.228) har mest RAM.
 - Domænenavn / proxy-host i nginxproxymanager er ikke valgt.
-- Om gæstespillere skal kunne "kræves" af en ny bruger ved oprettelse (koble sin konto til en
-  eksisterende gæst) — datamodellen understøtter det, men flowet er ikke designet.
+- Om `group_member.role` skal bruges til noget, fx at kun ejeren må slette gruppen.

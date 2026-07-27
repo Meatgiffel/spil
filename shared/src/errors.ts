@@ -38,6 +38,10 @@ export const ERROR_CODES = [
   "play_not_found",
   "player_other_account",
   "player_claims_other_account",
+  "player_not_guest",
+  "target_not_account",
+  "link_needs_all_groups",
+  "player_not_found",
   "id_mismatch",
 
   // Filer
@@ -83,6 +87,11 @@ export const ERROR_TEXT: Record<ErrorCode, string> = {
   play_not_found: "Partiet findes ikke.",
   player_other_account: "Spilleren tilhører en anden konto.",
   player_claims_other_account: "Du kan ikke knytte en spiller til en anden konto.",
+  player_not_guest: "Spilleren er allerede knyttet til en konto.",
+  target_not_account: "Der er ingen konto på den spiller.",
+  link_needs_all_groups:
+    "Du skal være medlem af alle de grupper gæsten er med i for at kunne koble.",
+  player_not_found: "Spilleren findes ikke.",
   id_mismatch: "Id'et matcher ikke.",
 
   file_missing: "Der var ingen fil med.",

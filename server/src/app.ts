@@ -4,6 +4,7 @@ import { HttpError, sendError } from "./http.js";
 import { authRouter, mountBetterAuth } from "./routes/auth.js";
 import { gamesRouter } from "./routes/games.js";
 import { invitesRouter } from "./routes/invites.js";
+import { playersRouter } from "./routes/players.js";
 import { syncRouter } from "./routes/sync.js";
 import { uploadsRouter } from "./routes/uploads.js";
 
@@ -27,6 +28,7 @@ app.use("/api", authRouter);
 app.use("/api/invites", invitesRouter);
 app.use("/api/sync", syncRouter);
 app.use("/api/games", gamesRouter);
+app.use("/api/players", playersRouter);
 app.use("/api/uploads", uploadsRouter);
 
 // I produktion serverer nginx /uploads direkte og når aldrig hertil. Det her er

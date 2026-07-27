@@ -42,6 +42,13 @@ export const createInviteKeySchema = z.object({
   expiresAt: z.number().int().min(0).nullable().default(null),
 });
 
+/** Sammenlægning af en gæst med en konto. Kan ikke laves offline. */
+export const linkPlayerSchema = z.object({
+  targetPlayerId: z.uuid({ error: "id_invalid" }),
+});
+
+export type LinkPlayerInput = z.infer<typeof linkPlayerSchema>;
+
 export type SignUpInput = z.infer<typeof signUpSchema>;
 export type SetupInput = z.infer<typeof setupSchema>;
 export type CreateInviteKeyInput = z.infer<typeof createInviteKeySchema>;
