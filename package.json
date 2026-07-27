@@ -1,0 +1,23 @@
+{
+  "name": "spil",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "shared",
+    "server",
+    "client"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "npm run build --workspace @spil/shared && (npm run dev --workspace @spil/server & npm run dev --workspace @spil/client)",
+    "build": "npm run build --workspace @spil/shared && npm run build --workspace @spil/server && npm run build --workspace @spil/client",
+    "typecheck": "npm run build --workspace @spil/shared && tsc -p server/tsconfig.json --noEmit && tsc -p client/tsconfig.json --noEmit",
+    "db:generate": "npm run db:generate --workspace @spil/server",
+    "db:migrate": "npm run db:migrate --workspace @spil/server",
+    "test": "npm run build --workspace @spil/shared && npm run test --workspace @spil/server && npm run test --workspace @spil/client",
+    "test:e2e": "npm run build --workspace @spil/shared && npm run build --workspace @spil/client && npm run test:e2e --workspace @spil/client"
+  }
+}

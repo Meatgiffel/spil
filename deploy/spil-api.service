@@ -1,0 +1,30 @@
+[Unit]
+Description=Spil API
+After=network.target
+
+[Service]
+Type=simple
+User=spil
+Group=spil
+WorkingDirectory=/opt/spil/api
+ExecStart=/usr/bin/node /opt/spil/api/index.js
+Restart=always
+RestartSec=2
+
+# Hemmelighederne står bevidst ikke som Environment= i unit-filen: den er
+# world-readable. /etc/spil/spil.env er 0600 og ejes af root.
+EnvironmentFile=/etc/spil/spil.env
+
+# Hærdning, samme sæt som indkob. ReadWritePaths er den eneste mappe servicen
+# må skrive i — database, uploads og backups ligger alle der.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+ReadWritePaths=/var/lib/spil
+
+[Install]
+WantedBy=multi-user.target

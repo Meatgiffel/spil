@@ -1,0 +1,35 @@
+{
+  "name": "@spil/server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "node scripts/build.mjs",
+    "start": "node dist/index.js",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "tsx src/db/migrate.ts",
+    "test": "tsx --test --test-reporter spec \"test/**/*.test.ts\""
+  },
+  "dependencies": {
+    "@spil/shared": "*",
+    "better-auth": "^1.6.0",
+    "better-sqlite3": "^12.11.0",
+    "drizzle-orm": "^0.45.0",
+    "express": "^5.2.0",
+    "fast-xml-parser": "^5.10.0",
+    "multer": "^2.2.0",
+    "uuid": "^14.0.0",
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/express": "^5.0.6",
+    "@types/multer": "^2.2.0",
+    "@types/node": "^26.0.0",
+    "drizzle-kit": "^0.31.10",
+    "tsx": "^4.23.0",
+    "typescript": "^5.9.0",
+    "esbuild": "^0.25.0"
+  }
+}

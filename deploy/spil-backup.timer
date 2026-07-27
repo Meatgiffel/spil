@@ -1,0 +1,12 @@
+[Unit]
+Description=Daglig backup af Spil-databasen
+
+[Timer]
+# Kl. 3:17 frem for 3:00 — spredt ud, så den ikke rammer samtidig med alt
+# andet der kører på hele timen i clusteret.
+OnCalendar=*-*-* 03:17:00
+Persistent=true
+RandomizedDelaySec=600
+
+[Install]
+WantedBy=timers.target
