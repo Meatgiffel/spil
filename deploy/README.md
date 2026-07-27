@@ -18,19 +18,21 @@ Proxmox-noder: `thor` .225, `odin` .226, `frigg` .227, `balder` .228.
 
 ```bash
 ssh root@192.168.50.225 "pvesh get /cluster/resources --type vm --output-format json" \
-  | jq -r '.[] | select(.vmid==130) | "vmid=\(.vmid) node=\(.node) status=\(.status)"'
+  | jq -r '.[] | select(.vmid==117) | "vmid=\(.vmid) node=\(.node) status=\(.status)"'
 ```
 
 ## Containeren
 
 | | |
 |---|---|
-| CT | 130, navn `spil` |
-| Type | Unprivilegeret Debian 13 |
-| RAM | 1 GB (Node fylder mere end de 0.5 GB CT 110/120 bruger) |
-| Cores | 2 |
+| IP | 192.168.50.42 |
+| Node | `balder` (192.168.50.228) — kan flytte, se ovenfor |
+| CT | **117**, navn `spil` |
+| Type | Unprivilegeret Debian 13 (trixie) |
+| RAM | 512 MB + 512 MB swap. Kører, men 1 GB er rigeligere hvis den bliver træg |
+| Cores | 1 |
 | Rootfs | 8 GB på `proxmox-data` |
-| HA | Ja, som CT 110 og 120 |
+| HA | **Ikke slået til.** CT 110 og 120 er HA-styrede — overvej det samme her |
 
 ## Førstegangsopsætning
 
@@ -40,8 +42,8 @@ Containeren har hverken git eller repoet, så `deploy/`-mappen skubbes ind fra P
 NODE=192.168.50.228          # den node pvesh-kommandoen ovenfor pegede på
 tar -czf /tmp/spil-deploy.tar.gz -C ~/Workspace/spil deploy
 scp /tmp/spil-deploy.tar.gz root@$NODE:/tmp/
-ssh root@$NODE 'pct push 130 /tmp/spil-deploy.tar.gz /tmp/spil-deploy.tar.gz'
-ssh root@$NODE 'pct exec 130 -- bash -c "cd /tmp && tar xzf spil-deploy.tar.gz && bash deploy/lxc-bootstrap.sh Meatgiffel/spil"'
+ssh root@$NODE 'pct push 117 /tmp/spil-deploy.tar.gz /tmp/spil-deploy.tar.gz'
+ssh root@$NODE 'pct exec 117 -- bash -c "cd /tmp && tar xzf spil-deploy.tar.gz && bash deploy/lxc-bootstrap.sh Meatgiffel/spil"'
 ```
 
 `lxc-bootstrap.sh` er idempotent. Den installerer nginx, Node 22 fra NodeSource og sqlite3,
@@ -58,7 +60,7 @@ Bagefter:
 ## Opdatering
 
 ```bash
-ssh root@$NODE 'pct exec 130 -- /usr/local/bin/spil-update Meatgiffel/spil'
+ssh root@$NODE 'pct exec 117 -- /usr/local/bin/spil-update Meatgiffel/spil'
 ```
 
 Rækkefølgen i scriptet er `VACUUM INTO`-backup → udpak → migrations → symlink-swap → restart →
@@ -70,10 +72,10 @@ dårlig migration efterlader den gamle version kørende.
 De sidste fem releases bliver liggende, så rollback er et symlink-skift:
 
 ```bash
-ssh root@$NODE 'pct exec 130 -- bash -c "
+ssh root@$NODE 'pct exec 117 -- bash -c "
   ls -1dt /opt/spil/releases/*/ | head -5
 "'
-ssh root@$NODE 'pct exec 130 -- bash -c "
+ssh root@$NODE 'pct exec 117 -- bash -c "
   ln -sfn /opt/spil/releases/<stempel> /opt/spil/current && systemctl restart spil-api
 "'
 ```

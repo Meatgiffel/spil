@@ -97,7 +97,8 @@ Tests booter den rigtige Express-app mod en temp-SQLite med env-variabler sat i 
 ## Produktion
 
 Kører i en **unprivilegeret Debian-LXC** på Proxmox-clusteret "Asgard", modelleret efter
-CT 110 (indkob) og CT 120 (flagplan). Foreslået CT 130 "spil". TLS termineres opad i
+CT 110 (indkob) og CT 120 (flagplan). Kører som **CT 117 "spil"** på `balder`, 192.168.50.42.
+TLS termineres opad i
 nginxproxymanager (CT 104) — der er ingen TLS i containeren.
 
 | Ting | Værdi |
@@ -122,7 +123,7 @@ Overtaget fra indkobs runbook, og den gælder også her:
 1. Find den aktive host-node først — containeren kan flytte mellem noder:
    ```bash
    ssh root@192.168.50.225 "pvesh get /cluster/resources --type vm --output-format json" \
-     | jq -r '.[] | select(.vmid==130) | "vmid=\(.vmid) node=\(.node)"'
+     | jq -r '.[] | select(.vmid==117) | "vmid=\(.vmid) node=\(.node)"'
    ```
 2. Verificér status på containeren.
 3. **Vis den konkrete update-kommando til brugeren og spørg om den må køres.**
