@@ -2,14 +2,18 @@
 #
 # Førstegangsopsætning af LXC'en. Køres inde i containeren, som root:
 #
-#   ./lxc-bootstrap.sh Meatgiffel/spil
+#   ./lxc-bootstrap.sh Meatgiffel/spil https://spil.cvre.dk
+#
+# Andet argument er den adresse appen nås på udefra. Uden den rigtige adresse
+# afviser Better Auth session-cookien, og man kan ikke logge ind.
 #
 # Idempotent — den kan køres igen uden at ødelægge data.
 set -euo pipefail
 
 REPO="${1:-${SPIL_REPO:-}}"
-if [[ -z "${REPO}" ]]; then
-  echo "Brug: $0 <ejer/repo>" >&2
+PUBLIC_URL="${2:-${SPIL_PUBLIC_URL:-}}"
+if [[ -z "${REPO}" || -z "${PUBLIC_URL}" ]]; then
+  echo "Brug: $0 <ejer/repo> <https://adresse>" >&2
   exit 1
 fi
 if [[ "$(id -u)" -ne 0 ]]; then
@@ -55,15 +59,15 @@ PORT=5060
 DATABASE_PATH=/var/lib/spil/spil.db
 UPLOADS_DIR=/var/lib/spil/uploads
 BETTER_AUTH_SECRET=${SECRET}
-# Ret de to herunder til det navn appen nås på udefra, ellers bliver
-# session-cookien afvist.
-PUBLIC_URL=https://spil.example.dk
-TRUSTED_ORIGINS=https://spil.example.dk
+PUBLIC_URL=${PUBLIC_URL}
+TRUSTED_ORIGINS=${PUBLIC_URL}
 EOF
   chmod 0600 /etc/spil/spil.env
-  echo "    /etc/spil/spil.env oprettet — ret PUBLIC_URL og TRUSTED_ORIGINS før brug."
+  echo "    /etc/spil/spil.env oprettet for ${PUBLIC_URL}"
 else
-  echo "    /etc/spil/spil.env findes allerede, rører den ikke."
+  # Adressen kan være ændret siden sidst; hemmeligheden røres aldrig.
+  sed -i "s|^PUBLIC_URL=.*|PUBLIC_URL=${PUBLIC_URL}|; s|^TRUSTED_ORIGINS=.*|TRUSTED_ORIGINS=${PUBLIC_URL}|" /etc/spil/spil.env
+  echo "    /etc/spil/spil.env fandtes — adressen sat til ${PUBLIC_URL}, hemmeligheden urørt."
 fi
 
 echo "==> systemd"
@@ -87,13 +91,13 @@ systemctl enable --now nginx
 echo "==> Første release"
 /usr/local/bin/spil-update "${REPO}"
 
-cat <<'EOF'
+cat <<EOF
 
 Færdig.
 
-  1. Ret PUBLIC_URL og TRUSTED_ORIGINS i /etc/spil/spil.env til det rigtige navn,
-     og kør: systemctl restart spil-api
-  2. Opret en proxy-host i nginxproxymanager (CT 104) der peger på denne container.
-  3. Åbn appen — første besøg viser opsætningssiden, hvor du opretter administratoren.
+  1. Opret en proxy-host i nginxproxymanager (CT 104) mod denne container, port 80,
+     for ${PUBLIC_URL}.
+  2. Åbn ${PUBLIC_URL} — første besøg viser opsætningssiden, hvor du opretter
+     administratoren.
 
 EOF

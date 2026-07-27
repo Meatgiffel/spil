@@ -43,7 +43,7 @@ NODE=192.168.50.228          # den node pvesh-kommandoen ovenfor pegede på
 tar -czf /tmp/spil-deploy.tar.gz -C ~/Workspace/spil deploy
 scp /tmp/spil-deploy.tar.gz root@$NODE:/tmp/
 ssh root@$NODE 'pct push 117 /tmp/spil-deploy.tar.gz /tmp/spil-deploy.tar.gz'
-ssh root@$NODE 'pct exec 117 -- bash -c "cd /tmp && tar xzf spil-deploy.tar.gz && bash deploy/lxc-bootstrap.sh Meatgiffel/spil"'
+ssh root@$NODE 'pct exec 117 -- bash -c "cd /tmp && tar xzf spil-deploy.tar.gz && bash deploy/lxc-bootstrap.sh Meatgiffel/spil https://spil.cvre.dk"'
 ```
 
 `lxc-bootstrap.sh` er idempotent. Den installerer nginx, Node 22 fra NodeSource og sqlite3,
