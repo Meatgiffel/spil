@@ -25,7 +25,9 @@ export const auth = betterAuth({
     enabled: true,
     // Selve oprettelsen går gennem POST /api/signup, som håndhæver invitationsnøglen.
     // Better Auths eget sign-up-endpoint blokeres i routes/auth.ts.
-    minPasswordLength: 10,
+    // Skal matche signUpSchema i shared/src/auth.ts. Er de uenige, afviser den
+    // ene et kodeord den anden lige har godkendt.
+    minPasswordLength: 6,
     maxPasswordLength: 200,
     requireEmailVerification: false,
   },

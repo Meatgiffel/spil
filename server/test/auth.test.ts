@@ -190,6 +190,34 @@ describe("auth og invitationsnøgler", () => {
     assert.equal(ok.status, 200);
   });
 
+  it("accepterer et kort kodeord på 6 tegn", async () => {
+    const created = await post("/api/invites", {}, adminCookie);
+    const invite = (created.body as Json).inviteKey as Json;
+
+    const response = await post("/api/signup", {
+      email: "kort@example.com",
+      name: "Kort",
+      password: "abcdef",
+      inviteKey: invite.key as string,
+    });
+    assert.equal(response.status, 200, JSON.stringify(response.body));
+  });
+
+  it("afviser stadig et kodeord på under 6 tegn", async () => {
+    const created = await post("/api/invites", {}, adminCookie);
+    const invite = (created.body as Json).inviteKey as Json;
+
+    const response = await post("/api/signup", {
+      email: "kortere@example.com",
+      name: "Kortere",
+      password: "abcde",
+      inviteKey: invite.key as string,
+    });
+    assert.equal(response.status, 400);
+    const fields = ((response.body as Json).error as Json).fields as Json;
+    assert.match(String(fields.password), /mindst 6 tegn/);
+  });
+
   it("nægter en almindelig bruger adgang til nøgleadministration", async () => {
     const login = await postRaw("/api/auth/sign-in/email", {
       email: "mette@example.com",
@@ -209,7 +237,7 @@ describe("auth og invitationsnøgler", () => {
     const { player } = await import("../src/db/schema.js");
     const players = await db.select().from(player).all();
     const names = players.map((row) => row.name).sort();
-    assert.deepEqual(names, ["Casper", "Frisk", "Mette"]);
+    assert.deepEqual(names, ["Casper", "Frisk", "Kort", "Mette"]);
     assert.ok(
       players.every((row) => row.userId !== null),
       "spillere oprettet ved signup skal være koblet til kontoen",

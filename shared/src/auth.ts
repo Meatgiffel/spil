@@ -25,7 +25,10 @@ export const signUpSchema = z.object({
     .max(80, { error: "Navnet må højst være 80 tegn." }),
   password: z
     .string()
-    .min(10, { error: "Kodeordet skal være mindst 10 tegn." })
+    // Bevidst lavt og uden krav til tegntyper: appen er lukket bag en
+    // invitationsnøgle, og login er rate-limitet til 10 forsøg pr. kvarter pr.
+    // IP. Kravene skal matche server/src/auth.ts.
+    .min(6, { error: "Kodeordet skal være mindst 6 tegn." })
     .max(200, { error: "Kodeordet må højst være 200 tegn." }),
   inviteKey: inviteKeySchema,
 });
