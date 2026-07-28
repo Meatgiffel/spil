@@ -1,80 +1,28 @@
-import { useEffect, useRef, useState } from "react";
-import { ApiError, api, post } from "../api.js";
-import { Field } from "../components.js";
+import { useState } from "react";
+import { ApiError } from "../api.js";
+import { importBggGame, useBggSearch, type BggHit } from "../bgg.js";
+import { Field, GameCover } from "../components.js";
 import { translateError, useT } from "../i18n/index.js";
-import { sync } from "../db/sync.js";
-
-type Hit = { bggId: number; title: string; year: number | null };
 
 /**
- * Søgning i BoardGameGeek. Serveren proxyer og cacher, så vi hverken rammer
- * CORS eller sender et kald af sted på hvert tastetryk.
+ * Søgning i BoardGameGeek på spilbiblioteket.
  *
- * BGG er langsom og går ned med jævne mellemrum. Derfor er hele komponenten
- * valgfri: fejler den, siger den det og lader brugeren oprette spillet manuelt.
+ * Registreringsflowet har sin egen indgang til det samme — se NewPlay. Denne
+ * her findes stadig, fordi man også vil kunne bygge biblioteket op i forvejen,
+ * uden at være midt i at registrere et parti.
  */
 export function BggSearch() {
   const t = useT();
   const [query, setQuery] = useState("");
-  const [hits, setHits] = useState<Hit[] | null>(null);
-  const [state, setState] = useState<"idle" | "searching" | "error">("idle");
-  const [message, setMessage] = useState<string | null>(null);
   const [importing, setImporting] = useState<number | null>(null);
-  const [configured, setConfigured] = useState<boolean | null>(null);
-  const debounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { configured, hits, state, message, setMessage } = useBggSearch(query);
 
-  useEffect(() => {
-    // BGG kræver et API-token siden efteråret 2025. Er der ikke sat et, er der
-    // ingen grund til at vise et søgefelt der aldrig kan give et resultat.
-    void api<{ configured: boolean }>("/api/games/bgg-status")
-      .then((body) => setConfigured(body.configured))
-      .catch(() => setConfigured(null));
-  }, []);
-
-  useEffect(() => {
-    if (debounce.current) clearTimeout(debounce.current);
-    const trimmed = query.trim();
-    if (trimmed.length < 2) {
-      setHits(null);
-      setState("idle");
-      return;
-    }
-
-    debounce.current = setTimeout(() => {
-      setState("searching");
-      setMessage(null);
-      void api<{ results: Hit[] }>(`/api/games/search?q=${encodeURIComponent(trimmed)}`)
-        .then((body) => {
-          setHits(body.results.slice(0, 15));
-          setState("idle");
-        })
-        .catch((error: unknown) => {
-          setState("error");
-          setHits(null);
-          setMessage(
-            error instanceof ApiError
-              ? error.status === 0
-                ? t("bgg.needsConnection")
-                : translateError(t, error.code, error.message)
-              : t("errors.unknown"),
-          );
-        });
-    }, 400);
-
-    return () => {
-      if (debounce.current) clearTimeout(debounce.current);
-    };
-  }, [query]);
-
-  async function importGame(hit: Hit) {
+  async function importGame(hit: BggHit) {
     setImporting(hit.bggId);
     setMessage(null);
     try {
-      await post("/api/games/import", { bggId: hit.bggId });
+      await importBggGame(hit.bggId);
       setQuery("");
-      setHits(null);
-      // Spillet er oprettet på serveren — næste pull henter det ned.
-      void sync();
     } catch (error) {
       setMessage(
         error instanceof ApiError
@@ -87,9 +35,7 @@ export function BggSearch() {
   }
 
   if (configured === false) {
-    return (
-      <p className="lede">{t("bgg.notConfigured")}</p>
-    );
+    return <p className="lede">{t("bgg.notConfigured")}</p>;
   }
 
   return (
@@ -120,6 +66,7 @@ export function BggSearch() {
               disabled={importing !== null}
               onClick={() => void importGame(hit)}
             >
+              <GameCover title={hit.title} path={hit.thumbnailPath} />
               <span className="name">{hit.title}</span>
               {hit.year && <span className="kicker">{hit.year}</span>}
               <span className="kicker" style={{ color: "var(--accent)" }}>

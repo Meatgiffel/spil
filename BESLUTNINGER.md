@@ -211,6 +211,37 @@ den rigtige type.
 gæt her vender vinderen på hovedet — modsat udfaldstypen, hvor et forkert gæt bare er et forkert
 udgangspunkt.
 
+---
+
+### BGG-søgningen ligger i registreringsflowet, ikke kun i biblioteket
+
+*Ændret 2026-07-28.*
+
+Oprindeligt søgte feltet på "Hvilket spil?" kun i det lokale bibliotek, og BGG-søgningen lå på
+spilskærmen. Det var en fejl i praksis: man står med spillet foran sig, skriver titlen, og får
+ingenting — uden at der er noget der antyder at man skal et andet sted hen først.
+
+Nu søger det samme felt begge steder. **Lokale træffere vises først og virker offline**; BGG-delen
+kommer under, i sit eget afsnit, og forsvinder helt uden net eller token. Rækkefølgen er ikke
+kosmetik — den holder registreringsflowet brugbart offline, hvilket var hele grunden til at holde
+netværket ude af det til at begynde med.
+
+Spil man allerede har, filtreres ud af BGG-listen. Ellers ville det samme spil stå to gange, og den
+ene af dem ville kræve forbindelse.
+
+Importen venter på synkroniseringen, før spillet vælges. Uden ventetiden kunne man vælge et spil der
+endnu ikke fandtes i Dexie, og næste trin ville stå uden udfaldstype.
+
+**Covers hentes hjem på serveren**, også for søgeresultater der aldrig bliver importeret. Klienten
+henter aldrig billeder fra geekdo — samme grund til at API'et proxyes: biblioteket skal virke
+offline, og brugerens IP skal ikke sendes videre. Filnavnet er bgg-id'et, så et cover kun hentes
+én gang, og importen bagefter er gratis.
+
+BGG's søgesvar indeholder hverken cover eller spillerantal, så det kræver et ekstra `thing`-opslag.
+Det samles til **ét kald** for alle træffere, og id'erne sorteres, så to søgninger med de samme
+træffere i forskellig rækkefølge rammer den samme cache-nøgle. Fejler opslaget, returneres titlerne
+alligevel — et manglende cover må ikke koste søgeresultatet.
+
 ### To sprog, engelsk som standard
 
 *Tilføjet 2026-07-27. App'en var oprindeligt kun dansk.*

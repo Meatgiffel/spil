@@ -44,7 +44,7 @@ async function registrerParti(page: Page, spil: string) {
   await expect(page.getByRole("heading", { name: "Which group?" })).toBeVisible();
   await page.getByRole("button", { name: /Spilklubben/ }).click();
 
-  await page.getByLabel("Search the library").fill(spil);
+  await page.getByLabel("Search games").fill(spil);
   await page.getByRole("button", { name: new RegExp(`Create .${spil}`) }).click();
 
   await page.getByRole("button", { name: /Casper/ }).click();

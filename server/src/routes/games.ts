@@ -1,11 +1,17 @@
-import { mkdirSync } from "node:fs";
+import { existsSync, mkdirSync } from "node:fs";
 import { writeFile } from "node:fs/promises";
 import path from "node:path";
 import { Router } from "express";
 import { eq } from "drizzle-orm";
 import { v7 as uuidv7 } from "uuid";
 import { z } from "zod";
-import { BggAuthError, bggIsConfigured, gameDetails, searchGames } from "../bgg.js";
+import {
+  BggAuthError,
+  bggIsConfigured,
+  gameDetails,
+  gameDetailsBatch,
+  searchGames,
+} from "../bgg.js";
 import { db } from "../db/client.js";
 import { game } from "../db/schema.js";
 import { env } from "../env.js";
@@ -26,10 +32,42 @@ gamesRouter.get("/bgg-status", (_req, res) => {
   res.json({ configured: bggIsConfigured() });
 });
 
+// Så mange træffere beriges med cover og spillerantal. BGG's søgning kan give
+// hundredvis, og detaljeopslaget er det dyre kald — listen skal alligevel kunne
+// skimmes på en telefon.
+const SEARCH_LIMIT = 12;
+
 gamesRouter.get("/search", async (req, res, next) => {
   try {
     const { q } = parseOrThrow(searchSchema, req.query);
-    res.json({ results: await searchGames(q) });
+    const hits = (await searchGames(q)).slice(0, SEARCH_LIMIT);
+
+    // BGG's søgesvar indeholder hverken cover eller spillerantal — kun id, titel
+    // og årstal. Detaljerne hentes i ét samlet thing-kald.
+    let details: Awaited<ReturnType<typeof gameDetailsBatch>> = [];
+    try {
+      details = await gameDetailsBatch(hits.map((hit) => hit.bggId));
+    } catch {
+      // Et manglende cover må ikke koste søgeresultatet. Titlerne alene er
+      // stadig nok til at vælge og importere et spil.
+    }
+    const byId = new Map(details.map((row) => [row.bggId, row]));
+
+    const results = await Promise.all(
+      hits.map(async (hit) => {
+        const detail = byId.get(hit.bggId);
+        return {
+          ...hit,
+          minPlayers: detail?.minPlayers ?? null,
+          maxPlayers: detail?.maxPlayers ?? null,
+          thumbnailPath: detail?.thumbnailUrl
+            ? await ensureThumbnail(detail.thumbnailUrl, hit.bggId)
+            : null,
+        };
+      }),
+    );
+
+    res.json({ results });
   } catch (error) {
     if (error instanceof HttpError) {
       next(error);
@@ -51,25 +89,35 @@ const importSchema = z.object({ bggId: z.number().int().min(1) });
 
 const IMAGE_EXTENSIONS = new Set([".jpg", ".jpeg", ".png", ".webp", ".gif"]);
 
-/** Henter thumbnailen ned lokalt, så biblioteket også virker offline. */
-async function downloadThumbnail(url: string, bggId: number): Promise<string | null> {
+/**
+ * Henter coveret ned lokalt, hvis det ikke allerede ligger der.
+ *
+ * Billederne hentes hjem frem for at blive vist fra BGG's CDN. Dels virker
+ * biblioteket så offline, dels er det den samme grund til at selve API'et
+ * proxyes: klienten skal ikke selv sende kald til geekdo.
+ *
+ * Filnavnet er bygget af bgg-id'et, så en søgning der viser det samme spil igen
+ * genbruger filen i stedet for at hente den forfra.
+ */
+async function ensureThumbnail(url: string, bggId: number): Promise<string | null> {
   try {
     const extension = path.extname(new URL(url).pathname).toLowerCase();
     if (!IMAGE_EXTENSIONS.has(extension)) return null;
 
+    const filename = `${bggId}${extension}`;
+    const directory = path.join(env.UPLOADS_DIR, "games");
+    const target = path.join(directory, filename);
+    const publicPath = `/uploads/games/${filename}`;
+    if (existsSync(target)) return publicPath;
+
     const response = await fetch(url, { signal: AbortSignal.timeout(10_000) });
     if (!response.ok) return null;
 
-    const directory = path.join(env.UPLOADS_DIR, "games");
     mkdirSync(directory, { recursive: true });
-    const filename = `${bggId}${extension}`;
-    await writeFile(
-      path.join(directory, filename),
-      Buffer.from(await response.arrayBuffer()),
-    );
-    return `/uploads/games/${filename}`;
+    await writeFile(target, Buffer.from(await response.arrayBuffer()));
+    return publicPath;
   } catch {
-    // Et manglende cover må aldrig blokere importen.
+    // Et manglende cover må aldrig blokere hverken søgning eller import.
     return null;
   }
 }
@@ -88,7 +136,7 @@ gamesRouter.post("/import", async (req, res, next) => {
     if (!details) throw notFound("not_found");
 
     const thumbnailPath = details.thumbnailUrl
-      ? await downloadThumbnail(details.thumbnailUrl, bggId)
+      ? await ensureThumbnail(details.thumbnailUrl, bggId)
       : null;
 
     const row = {

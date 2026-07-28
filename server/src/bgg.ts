@@ -3,10 +3,16 @@ import { eq } from "drizzle-orm";
 import { db } from "./db/client.js";
 import { bggCache } from "./db/schema.js";
 import { env } from "./env.js";
-import { parseSearch, parseThing, type BggDetails, type BggSearchHit } from "./bgg-parse.js";
+import {
+  parseSearch,
+  parseThing,
+  parseThings,
+  type BggDetails,
+  type BggSearchHit,
+} from "./bgg-parse.js";
 
 export type { BggDetails, BggSearchHit } from "./bgg-parse.js";
-export { parseSearch, parseThing } from "./bgg-parse.js";
+export { parseSearch, parseThing, parseThings } from "./bgg-parse.js";
 
 const BASE = "https://boardgamegeek.com/xmlapi2";
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
@@ -93,4 +99,16 @@ export async function searchGames(query: string): Promise<BggSearchHit[]> {
 
 export async function gameDetails(bggId: number): Promise<BggDetails | null> {
   return parseThing(await fetchXml(`${BASE}/thing?id=${bggId}`));
+}
+
+/**
+ * Detaljer for flere spil i ét kald.
+ *
+ * Id'erne sorteres, så to søgninger der giver de samme træffere i forskellig
+ * rækkefølge rammer den samme cache-nøgle.
+ */
+export async function gameDetailsBatch(bggIds: number[]): Promise<BggDetails[]> {
+  if (bggIds.length === 0) return [];
+  const ids = [...new Set(bggIds)].sort((a, b) => a - b).join(",");
+  return parseThings(await fetchXml(`${BASE}/thing?id=${ids}`));
 }

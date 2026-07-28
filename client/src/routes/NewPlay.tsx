@@ -3,11 +3,13 @@ import { useLiveQuery } from "dexie-react-hooks";
 import { useNavigate, useParams } from "react-router";
 import { v7 as uuidv7 } from "uuid";
 import { OUTCOME_TYPES, type OutcomeType } from "@spil/shared";
-import { Avatar, Empty, Field, ScreenHead } from "../components.js";
+import { ApiError } from "../api.js";
+import { importBggGame, useBggSearch, type BggHit } from "../bgg.js";
+import { Avatar, Empty, Field, GameCover, ScreenHead } from "../components.js";
 import { mutate, type LocalPlayer } from "../db/local.js";
 import { listGames, listGroupPlayers, listGroups } from "../db/queries.js";
 import { sync } from "../db/sync.js";
-import { useT } from "../i18n/index.js";
+import { translateError, useT } from "../i18n/index.js";
 import { outcomeHintKey, outcomeLabelKey, placementsFromScores } from "../outcome.js";
 import { useUser } from "../session.js";
 
@@ -87,6 +89,41 @@ export function NewPlayScreen() {
     if (!needle) return games ?? [];
     return (games ?? []).filter((game) => game.title.toLowerCase().includes(needle));
   }, [games, gameFilter]);
+
+  // Det samme felt søger både lokalt og på BGG. Lokale træffere vises med det
+  // samme og virker offline; BGG-delen kommer efter, når og hvis der er svar.
+  const bgg = useBggSearch(gameFilter);
+  const [importing, setImporting] = useState<number | null>(null);
+  const [importError, setImportError] = useState<string | null>(null);
+
+  const bggHits = useMemo(() => {
+    // Spil man allerede har i biblioteket skal ikke stå to gange. De lokale
+    // rækker er de rigtige at vælge — de virker også uden net.
+    const known = new Set((games ?? []).map((game) => game.bggId).filter(Boolean));
+    return (bgg.hits ?? []).filter((hit) => !known.has(hit.bggId));
+  }, [bgg.hits, games]);
+
+  async function chooseBggGame(hit: BggHit) {
+    setImporting(hit.bggId);
+    setImportError(null);
+    try {
+      // importBggGame venter på synkroniseringen, så spillet findes lokalt
+      // inden vi vælger det og går videre.
+      setGameId(await importBggGame(hit.bggId));
+      setNewGameTitle("");
+      setStep("hvem");
+    } catch (error) {
+      setImportError(
+        error instanceof ApiError
+          ? error.status === 0
+            ? t("bgg.needsConnection")
+            : translateError(t, error.code, error.message)
+          : t("errors.unknown"),
+      );
+    } finally {
+      setImporting(null);
+    }
+  }
 
   function togglePlayer(playerId: string) {
     setSelected((previous) => {
@@ -309,7 +346,13 @@ export function NewPlayScreen() {
         />
         <div className="screen-body">
           <h2>{t("play.whichGame")}</h2>
-          <Field label={t("play.searchLibrary")}>
+          {/* Etiketten er den samme uanset om BGG er sat op. Kun hjælpeteksten
+              skifter — et felt der skifter navn efter serverens opsætning er
+              ikke til at vænne sig til, hverken for øjet eller en skærmlæser. */}
+          <Field
+            label={t("play.searchGames")}
+            hint={bgg.configured === false ? undefined : t("play.searchGamesHint")}
+          >
             <input
               className="input"
               value={gameFilter}
@@ -317,6 +360,7 @@ export function NewPlayScreen() {
               onChange={(event) => {
                 setGameFilter(event.target.value);
                 setNewGameTitle(event.target.value);
+                setImportError(null);
               }}
             />
           </Field>
@@ -327,12 +371,14 @@ export function NewPlayScreen() {
                 key={game.id}
                 className={game.id === gameId ? "list-row list-row-active" : "list-row"}
                 type="button"
+                disabled={importing !== null}
                 onClick={() => {
                   setGameId(game.id);
                   setNewGameTitle("");
                   setStep("hvem");
                 }}
               >
+                <GameCover title={game.title} path={game.thumbnailPath} />
                 <span className="name">{game.title}</span>
                 {game.defaultOutcomeType && (
                   <span className="kicker">
@@ -342,6 +388,36 @@ export function NewPlayScreen() {
               </button>
             ))}
           </div>
+
+          {/* BGG-delen står for sig, så det er tydeligt hvad der allerede er ens
+              eget, og hvad der først skal hentes hjem. */}
+          {bgg.state === "searching" && <span className="lede">{t("bgg.searching")}</span>}
+          {importError && <span className="field-error">{importError}</span>}
+          {bgg.message && <span className="lede">{bgg.message}</span>}
+
+          {bggHits.length > 0 && (
+            <>
+              <h3>{t("play.fromBgg")}</h3>
+              <div className="stack-tight">
+                {bggHits.map((hit) => (
+                  <button
+                    key={hit.bggId}
+                    className="list-row"
+                    type="button"
+                    disabled={importing !== null}
+                    onClick={() => void chooseBggGame(hit)}
+                  >
+                    <GameCover title={hit.title} path={hit.thumbnailPath} />
+                    <span className="name">{hit.title}</span>
+                    {hit.year && <span className="kicker">{hit.year}</span>}
+                    <span className="kicker" style={{ color: "var(--accent)" }}>
+                      {importing === hit.bggId ? t("bgg.fetching") : t("bgg.add")}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
 
           {gameFilter.trim() && filteredGames.length === 0 && (
             <button

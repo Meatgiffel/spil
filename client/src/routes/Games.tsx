@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { v7 as uuidv7 } from "uuid";
-import { Empty, Field, Loading, PendingMark, ScreenHead } from "../components.js";
+import { Empty, Field, GameCover, Loading, PendingMark, ScreenHead } from "../components.js";
 import { mutate } from "../db/local.js";
 import { listGames } from "../db/queries.js";
 import { sync } from "../db/sync.js";
@@ -96,19 +96,7 @@ export function GamesScreen() {
           <div className="stack-tight">
             {games.map((game) => (
               <div key={game.id} className="list-row">
-                {game.thumbnailPath ? (
-                  <img
-                    src={game.thumbnailPath}
-                    alt=""
-                    width={34}
-                    height={34}
-                    style={{ objectFit: "cover", flex: "none" }}
-                  />
-                ) : (
-                  <span className="avatar avatar-guest" aria-hidden="true">
-                    {game.title.slice(0, 2).toUpperCase()}
-                  </span>
-                )}
+                <GameCover title={game.title} path={game.thumbnailPath} />
                 <span className="name">{game.title}</span>
                 {game.year && <span className="kicker">{game.year}</span>}
                 {game.pending && <PendingMark />}

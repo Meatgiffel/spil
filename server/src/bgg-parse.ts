@@ -111,26 +111,37 @@ export function parseSearch(xml: string): BggSearchHit[] {
     .filter((hit): hit is BggSearchHit => hit !== null);
 }
 
-export function parseThing(xml: string): BggDetails | null {
+/**
+ * Læser et thing-svar med vilkårligt mange emner.
+ *
+ * BGG tillader `thing?id=1,2,3`, og søgeresultaterne beriges med ét kald frem
+ * for ét pr. træffer — deres API er langsomt nok i forvejen.
+ */
+export function parseThings(xml: string): BggDetails[] {
   const parsed = parser.parse(xml) as { items?: { item?: unknown } };
-  const item = asArray(parsed.items?.item as Record<string, unknown>[] | undefined)[0];
-  if (!item) return null;
+  return asArray(parsed.items?.item as Record<string, unknown>[] | undefined)
+    .map((item) => {
+      const bggId = toNumber(item["@id"]);
+      const title = primaryName(item.name as XmlName | XmlName[] | undefined);
+      if (bggId === null || !title) return null;
 
-  const bggId = toNumber(item["@id"]);
-  const title = primaryName(item.name as XmlName | XmlName[] | undefined);
-  if (bggId === null || !title) return null;
+      const thumbnail = item.thumbnail;
+      return {
+        bggId,
+        title,
+        year: toNumber((item.yearpublished as XmlName | undefined)?.["@value"]),
+        minPlayers: toNumber((item.minplayers as XmlName | undefined)?.["@value"]),
+        maxPlayers: toNumber((item.maxplayers as XmlName | undefined)?.["@value"]),
+        thumbnailUrl: typeof thumbnail === "string" ? thumbnail : null,
+        defaultOutcomeType: outcomeFromMechanics(
+          mechanicIds(item.link as XmlLink | XmlLink[] | undefined),
+        ),
+      };
+    })
+    .filter((details): details is BggDetails => details !== null);
+}
 
-  const thumbnail = item.thumbnail;
-  return {
-    bggId,
-    title,
-    year: toNumber((item.yearpublished as XmlName | undefined)?.["@value"]),
-    minPlayers: toNumber((item.minplayers as XmlName | undefined)?.["@value"]),
-    maxPlayers: toNumber((item.maxplayers as XmlName | undefined)?.["@value"]),
-    thumbnailUrl: typeof thumbnail === "string" ? thumbnail : null,
-    defaultOutcomeType: outcomeFromMechanics(
-      mechanicIds(item.link as XmlLink | XmlLink[] | undefined),
-    ),
-  };
+export function parseThing(xml: string): BggDetails | null {
+  return parseThings(xml)[0] ?? null;
 }
 

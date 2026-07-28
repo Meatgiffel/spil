@@ -75,6 +75,33 @@ export function Avatar({
 }
 
 /**
+ * Spillets cover, med titlens forbogstaver som reserve.
+ *
+ * Stien peger altid på vores egen server — også for søgeresultater der endnu
+ * ikke er importeret. Covers hentes hjem på serveren, så klienten aldrig
+ * henter billeder direkte fra BGG.
+ */
+export function GameCover({ title, path }: { title: string; path: string | null }) {
+  if (!path) {
+    return (
+      <span className="avatar avatar-guest" aria-hidden="true">
+        {title.slice(0, 2).toUpperCase()}
+      </span>
+    );
+  }
+  return (
+    <img
+      src={path}
+      alt=""
+      width={34}
+      height={34}
+      loading="lazy"
+      style={{ objectFit: "cover", flex: "none", borderRadius: "var(--r)" }}
+    />
+  );
+}
+
+/**
  * Etiket, kontrol og fejl hører sammen.
  *
  * Id'et laves her og sættes på kontrollen med cloneElement, så label htmlFor og
