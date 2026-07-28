@@ -174,6 +174,43 @@ sendes deres egen svartekst med, så man kan se forskel på udløbet, forkert og
 
 Cachen bruges også når tokenet mangler, så allerede hentede søgninger stadig virker.
 
+*Bekræftet 2026-07-28 mod et rigtigt token: `Authorization: Bearer <token>` er det rigtige format.
+Uden header svarer BGG 401, med den 200. Formatet var indtil da gættet ud fra deres forum.*
+
+---
+
+### Udfaldstypen gættes ud fra BGG's mekanikker
+
+*Tilføjet 2026-07-28.*
+
+BGG har ikke noget felt der siger hvordan et spil vindes. Det tætteste er `boardgamemechanic`-links,
+og tre af dem er brugbare: **Cooperative Game** (2023) → `coop`, **Team-Based Game** (2019) → `teams`,
+og en kort liste point-mekanikker (End Game Bonuses, Hidden Victory Points, Area Majority,
+Set Collection) → `score`. Rammer intet, sættes typen til `null`, og klienten falder selv tilbage
+på placeringer.
+
+Rækkefølgen er prioriteten, og samarbejde kommer først: Pandemic har både Set Collection og
+Cooperative Game, og vinder man sammen, er point ligegyldige.
+
+**Mekanik-id'er, ikke navne.** BGG omdøber løbende sine mekanikker — "Area Control" hedder nu
+"Area Majority / Influence" — mens id'et står fast.
+
+**Solo-mekanikken bruges bevidst ikke.** 2819 "Solo / Solitaire Game" betyder *"har en soloversion"*,
+ikke *"er et solospil"*. Den sidder på Wingspan, Pandemic og Gloomhaven. Brugte vi den, ville
+næsten alle nyere spil defaulte til solo. `solo` må brugeren vælge selv. Der er en test der
+holder på det.
+
+Gættet er kun et **udgangspunkt**. Har spillet allerede en `default_outcome_type`, er den lært af
+et rigtigt parti og slår BGG — importen overskriver den aldrig.
+
+Verificeret mod 12 rigtige BGG-svar: Catan, Pandemic, Codenames, Mansions of Madness, Gloomhaven,
+Wingspan, 5-Minute Dungeon, Ticket to Ride, Azul, Carcassonne, The Mind og Scrabble ramte alle
+den rigtige type.
+
+`low_score_wins` gættes **ikke**. BGG har intet signal for om færrest point vinder, og et forkert
+gæt her vender vinderen på hovedet — modsat udfaldstypen, hvor et forkert gæt bare er et forkert
+udgangspunkt.
+
 ### To sprog, engelsk som standard
 
 *Tilføjet 2026-07-27. App'en var oprindeligt kun dansk.*

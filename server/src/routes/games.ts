@@ -94,7 +94,9 @@ gamesRouter.post("/import", async (req, res, next) => {
     const row = {
       id: existing?.id ?? uuidv7(),
       title: details.title,
-      defaultOutcomeType: existing?.defaultOutcomeType ?? null,
+      // Har spillet allerede en type, er den lært af et rigtigt parti og slår
+      // BGG's gæt. Ellers sætter vi gættet, som brugeren stadig kan rette.
+      defaultOutcomeType: existing?.defaultOutcomeType ?? details.defaultOutcomeType,
       lowScoreWins: existing?.lowScoreWins ?? false,
       bggId: details.bggId,
       year: details.year,
