@@ -116,13 +116,21 @@ test("sproget kan skiftes og huskes på tværs af genindlæsninger", async ({ br
   expect(await page.locator("html").getAttribute("lang")).toBe("en");
 
   await page.getByRole("link", { name: "Profile" }).click();
+
+  // Versionen skal kunne ses i UI'et. Den er bagt ind under bygningen, og
+  // e2e-bygningen kører uden release-scriptets variabler — derfor "dev".
+  await expect(page.getByRole("heading", { name: "Version" })).toBeVisible();
+  await expect(page.getByText("dev", { exact: true })).toBeVisible();
+  await expect(page.getByText("Development build")).toBeVisible();
+
   await page.getByRole("button", { name: "Dansk" }).click();
 
   // Hele appen skifter med det samme, ikke først ved næste indlæsning.
   await expect(page.getByRole("link", { name: "Grupper" })).toBeVisible();
   expect(await page.locator("html").getAttribute("lang")).toBe("da");
 
-  // Valget ligger i IndexedDB, så det holder også uden net.
+  // Valget ligger i localStorage, så det holder også uden net — og skrivningen
+  // er synkron, så den ikke kan nå at blive afbrudt af en genindlæsning.
   await page.reload();
   await expect(page.getByRole("link", { name: "Grupper" })).toBeVisible({
     timeout: 15_000,
