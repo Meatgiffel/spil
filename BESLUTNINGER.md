@@ -242,6 +242,46 @@ Det samles til **ét kald** for alle træffere, og id'erne sorteres, så to søg
 træffere i forskellig rækkefølge rammer den samme cache-nøgle. Fejler opslaget, returneres titlerne
 alligevel — et manglende cover må ikke koste søgeresultatet.
 
+---
+
+### Et nyt medlemskab stempler spillerrækkens `server_seq` om
+
+*Fejl fundet 2026-07-28 af en browsertest af kontosøgningen.*
+
+Tilføjede man en konto til en gruppe, dukkede personen **aldrig** op i medlemslisten.
+
+Årsagen sidder i sync-protokollen. En spiller er synlig for dem man deler gruppe med, og opslaget
+går gennem `group_member`. Medlemskabet får et nyt `server_seq` når det skrives — men spillerrækken
+beholder det den fik da kontoen blev oprettet, typisk langt under de andres cursor. Pull henter kun
+rækker over cursoren, så spilleren blev aldrig hentet, selv om vedkommende nu var synlig.
+
+Rettelsen: `groupMember.upsert` stempler den refererede spillers `server_seq` om med samme sekvens
+som medlemskabet. **Kun `server_seq`** — `updated_at` er klientens tid og afgør konflikter, og at
+skrue på den ville lade serveren vinde en konflikt den ikke har været part i.
+
+Koblingen af gæst til konto havde allerede den her rettelse indbygget, med en kommentar om hvorfor.
+Den samme indsigt manglede bare på vejen gennem sync.
+
+Det er den femte fejl testene har fundet som ikke kunne ses i koden — og den eneste af dem der
+krævede *to* konti for at vise sig. Derfor opretter e2e-testen nu en ekstra konto gennem API'et.
+
+---
+
+### Kontovælgeren søger, den lister ikke
+
+*Ændret 2026-07-28.*
+
+Både "Tilføj medlem" og "Kobl til konto" viste alle konti som en liste. Nu søger man i stedet, på
+**både navn og e-mail** — navnet alene skelner ikke to personer der hedder det samme, og e-mailen
+står derfor også under navnet.
+
+Filtreringen sker lokalt. Listen er allerede hentet, installationen er lukket bag invitationsnøgler,
+og et kald pr. tastetryk ville kun gøre den langsommere.
+
+De to steder deler én komponent, men har hver sin tomme tilstand: ved kobling betyder tom "der er
+ingen andre konti", ved medlem betyder den "alle med en konto er allerede med". Samme tekst til
+begge ville være forkert det ene sted.
+
 ### To sprog, engelsk som standard
 
 *Tilføjet 2026-07-27. App'en var oprindeligt kun dansk.*

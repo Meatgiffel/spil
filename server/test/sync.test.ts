@@ -372,4 +372,33 @@ describe("sync", () => {
     });
     assert.equal(response.status, 401);
   });
+
+  it("henter et nyt medlems spillerrække, selv om kontoen er gammel", async () => {
+    // Regressionstest. Carls spillerrække fik sit sekvensnummer da kontoen
+    // blev oprettet — længe før Anna nåede sin nuværende cursor. Bliver den
+    // ikke stemplet om når medlemskabet skrives, ligger den under cursoren for
+    // evigt, og Anna ser aldrig sit nye medlem.
+    //
+    // Carl bruges netop fordi han ikke er medlem af noget endnu.
+    const foer = await pull(anna.cookie);
+    const cursor = foer.cursor;
+    assert.equal(
+      foer.changes.player.find((row) => row.id === carl.playerId),
+      undefined,
+      "Carl må ikke være hentet endnu — ellers tester vi ikke det vi tror",
+    );
+
+    await push(anna.cookie, [
+      upsert(
+        "groupMember",
+        { id: uuidv7(), groupId, playerId: carl.playerId, role: "member" },
+        Date.now(),
+      ),
+    ]);
+
+    const efter = await pull(anna.cookie, cursor);
+    const carlsRaekke = efter.changes.player.find((row) => row.id === carl.playerId);
+    assert.ok(carlsRaekke, "Carls spillerrække skal komme med i pull");
+    assert.equal(carlsRaekke.name, "Carl");
+  });
 });

@@ -199,6 +199,20 @@ const configs: Record<SyncTable, TableConfig> = {
         .values(row)
         .onConflictDoUpdate({ target: groupMember.id, set: row })
         .run();
+
+      // Spilleren bliver først synlig for gruppen i og med det her medlemskab,
+      // men rækken har stadig det sekvensnummer den fik da kontoen blev
+      // oprettet — typisk længe under de andres cursor. Uden en ny sekvens
+      // ville pull aldrig komme forbi den igen, og det nye medlem ville aldrig
+      // dukke op hos nogen.
+      //
+      // Kun server_seq røres. updated_at er klientens tid og afgør konflikter;
+      // at skrue på den her ville lade serveren vinde en konflikt den ikke har
+      // været part i.
+      db.update(player)
+        .set({ serverSeq: meta.serverSeq })
+        .where(eq(player.id, row.playerId))
+        .run();
     },
     softDelete(id, meta) {
       db.update(groupMember).set(meta).where(eq(groupMember.id, id)).run();

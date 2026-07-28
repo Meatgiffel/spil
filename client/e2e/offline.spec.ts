@@ -139,3 +139,66 @@ test("sproget kan skiftes og huskes på tværs af genindlæsninger", async ({ br
 
   await ctx.close();
 });
+
+test("man søger kontoen frem i stedet for at skimme en liste", async ({
+  browser,
+  playwright,
+}) => {
+  // Anden konto oprettes gennem API'et. Går den gennem browseren, ville
+  // sessionscookien skifte til den nye bruger midt i testen.
+  const api = await playwright.request.newContext({ baseURL: "http://127.0.0.1:4173" });
+  const signIn = await api.post("/api/auth/sign-in/email", {
+    data: { email: EMAIL, password: KODEORD },
+  });
+  expect(signIn.ok()).toBeTruthy();
+
+  const keyResponse = await api.post("/api/invites", { data: { maxUses: 1 } });
+  const { inviteKey } = (await keyResponse.json()) as { inviteKey: { key: string } };
+
+  const signUp = await api.post("/api/signup", {
+    data: {
+      email: "bo@example.com",
+      name: "Bo Berg",
+      password: KODEORD,
+      inviteKey: inviteKey.key,
+    },
+  });
+  expect(signUp.ok()).toBeTruthy();
+  await api.dispose();
+
+  const ctx = await browser.newContext();
+  const page = await ctx.newPage();
+  await logInd(page);
+
+  await page.getByRole("link", { name: "Groups" }).click();
+  await page.getByRole("link", { name: /Spilklubben/ }).click();
+  await page.getByRole("button", { name: "Add member" }).click();
+
+  const search = page.getByLabel("Search accounts");
+  await expect(search).toBeVisible();
+
+  // E-mailen står under navnet — to personer kan hedde det samme.
+  await expect(page.getByText("bo@example.com")).toBeVisible();
+
+  await search.fill("berg");
+  await expect(page.getByRole("button", { name: /Bo Berg/ })).toBeVisible();
+
+  // Der søges også på e-mail, ikke kun navn.
+  await search.fill("bo@exa");
+  await expect(page.getByRole("button", { name: /Bo Berg/ })).toBeVisible();
+
+  await search.fill("findes-ikke");
+  await expect(page.getByText(/No accounts match/)).toBeVisible();
+
+  // Casper er allerede medlem og må derfor ikke kunne vælges igen.
+  await search.fill("casper");
+  await expect(page.getByText(/No accounts match/)).toBeVisible();
+
+  await search.fill("bo");
+  await page.getByRole("button", { name: /Bo Berg/ }).click();
+
+  await expect(page.getByText("2 players")).toBeVisible();
+  await expect(page.getByText("Bo Berg")).toBeVisible();
+
+  await ctx.close();
+});

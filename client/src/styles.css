@@ -453,6 +453,21 @@ textarea.input {
   font-weight: 800;
 }
 
+/* Navn med en ekstra linje under, fx e-mailen på en konto. .name er nowrap og
+   klipper med ellipsis, så de to skal stables frem for at stå inline. */
+.name-block {
+  flex: 1;
+  min-width: 0;
+}
+
+.name-block .name,
+.name-block .lede {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* ── Mærkater ────────────────────────────────────────────────────────────── */
 
 .tag {

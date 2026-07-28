@@ -20,11 +20,93 @@ import {
 import { sync } from "../db/sync.js";
 import { ApiError, api, post } from "../api.js";
 import { translateError } from "../i18n/index.js";
-import { formatDay } from "../format.js";
+import { compareNames, formatDay } from "../format.js";
 import { useT } from "../i18n/index.js";
 import { useUser } from "../session.js";
 
 type Account = { playerId: string; name: string; email: string };
+
+/**
+ * Vælg en konto ved at søge, ikke ved at skimme en liste.
+ *
+ * Der søges på både navn og e-mail. Navnet alene er ikke nok til at skelne to
+ * personer der hedder det samme, og e-mailen er det eneste der med sikkerhed
+ * er entydigt — derfor står den også under navnet.
+ *
+ * Filtreringen sker lokalt. Listen er allerede hentet, installationen er lukket
+ * bag invitationsnøgler, og et kald pr. tastetryk ville kun gøre den langsommere.
+ */
+function AccountPicker({
+  accounts,
+  exclude,
+  actionLabel,
+  emptyLabel,
+  onPick,
+}: {
+  accounts: Account[] | null;
+  /** Spiller-id'er der allerede er med, og derfor ikke skal kunne vælges. */
+  exclude: Set<string>;
+  actionLabel: string;
+  /** Vises når der ikke er nogen at vælge. Årsagen er forskellig de to steder. */
+  emptyLabel: string;
+  onPick: (account: Account) => void;
+}) {
+  const t = useT();
+  const [query, setQuery] = useState("");
+
+  if (accounts === null) return <Loading rows={2} />;
+
+  const available = accounts
+    .filter((account) => !exclude.has(account.playerId))
+    .sort((a, b) => compareNames(a.name, b.name));
+
+  if (available.length === 0) {
+    return <span className="lede">{emptyLabel}</span>;
+  }
+
+  const needle = query.trim().toLowerCase();
+  const matches = needle
+    ? available.filter(
+        (account) =>
+          account.name.toLowerCase().includes(needle) ||
+          account.email.toLowerCase().includes(needle),
+      )
+    : available;
+
+  return (
+    <div className="stack-tight">
+      <Field label={t("group.searchAccounts")}>
+        <input
+          className="input"
+          type="search"
+          value={query}
+          placeholder={t("group.searchAccountsPlaceholder")}
+          onChange={(event) => setQuery(event.target.value)}
+        />
+      </Field>
+
+      {matches.length === 0 && (
+        <span className="lede">{t("group.noAccountMatches", { query: query.trim() })}</span>
+      )}
+
+      {matches.map((account) => (
+        <button
+          key={account.playerId}
+          className="list-row"
+          type="button"
+          onClick={() => onPick(account)}
+        >
+          <Avatar name={account.name} />
+          <span className="name-block">
+            <span className="name">{account.name}</span>
+            <span className="lede">{account.email}</span>
+          </span>
+          <span className="kicker">{actionLabel}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
 
 export function GroupScreen() {
   const { groupId = "" } = useParams();
@@ -182,23 +264,14 @@ export function GroupScreen() {
                 {t("group.linkTitle", { name: linking.name })}
               </span>
               <p className="lede">{t("group.linkBody")}</p>
-              <div className="stack-tight">
-                {(accounts ?? []).map((account) => (
-                  <button
-                    key={account.playerId}
-                    className="list-row"
-                    type="button"
-                    onClick={() => void linkGuest(linking, account)}
-                  >
-                    <Avatar name={account.name} />
-                    <span className="name">{account.name}</span>
-                    <span className="kicker">{t("group.linkConfirm")}</span>
-                  </button>
-                ))}
-                {accounts?.length === 0 && (
-                  <span className="lede">{t("group.noAccounts")}</span>
-                )}
-              </div>
+              <AccountPicker
+                accounts={accounts}
+                // Gæsten selv har ingen konto, så der er intet at udelade her.
+                exclude={new Set()}
+                actionLabel={t("group.linkConfirm")}
+                emptyLabel={t("group.noAccounts")}
+                onPick={(account) => void linkGuest(linking, account)}
+              />
               <button
                 className="btn btn-secondary"
                 type="button"
@@ -212,28 +285,13 @@ export function GroupScreen() {
           {pickingMember && (
             <section className="card">
               <span className="card-title">{t("group.pickAccount")}</span>
-              <div className="stack-tight">
-                {(accounts ?? [])
-                  .filter(
-                    (account) => !players.some((row) => row.id === account.playerId),
-                  )
-                  .map((account) => (
-                    <button
-                      key={account.playerId}
-                      className="list-row"
-                      type="button"
-                      onClick={() => void addMember(account)}
-                    >
-                      <Avatar name={account.name} />
-                      <span className="name">{account.name}</span>
-                      <span className="kicker">{t("group.add")}</span>
-                    </button>
-                  ))}
-                {accounts !== null &&
-                  accounts.every((account) =>
-                    players.some((row) => row.id === account.playerId),
-                  ) && <span className="lede">{t("group.noAccounts")}</span>}
-              </div>
+              <AccountPicker
+                accounts={accounts}
+                exclude={new Set(players.map((row) => row.id))}
+                actionLabel={t("group.add")}
+                emptyLabel={t("group.allAlreadyMembers")}
+                onPick={(account) => void addMember(account)}
+              />
               <button
                 className="btn btn-secondary"
                 type="button"
