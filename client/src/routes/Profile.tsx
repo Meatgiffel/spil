@@ -4,6 +4,7 @@ import { formatDate, formatTime } from "../format.js";
 import { sync } from "../db/sync.js";
 import { LANGUAGES, LANGUAGE_NAMES, useLanguage } from "../i18n/index.js";
 import { useSession, useSyncStatus, useUser } from "../session.js";
+import { APP_BUILT_AT, APP_COMMIT, APP_VERSION } from "../version.js";
 
 export function ProfileScreen() {
   const user = useUser();
@@ -86,6 +87,29 @@ export function ProfileScreen() {
         {status.pending > 0 && (
           <Empty title={t("profile.queuedTitle")} body={t("profile.queuedBody")} />
         )}
+
+        <section className="stack-tight">
+          <h2>{t("profile.version")}</h2>
+          <div className="card card-flat">
+            <div className="spread">
+              <span className="name">{APP_VERSION}</span>
+              {APP_COMMIT && <span className="kicker">{APP_COMMIT}</span>}
+            </div>
+            <span className="lede">
+              {APP_BUILT_AT
+                ? t("profile.built", {
+                    date: formatDate(APP_BUILT_AT),
+                    time: formatTime(APP_BUILT_AT),
+                  })
+                : t("profile.builtUnknown")}
+            </span>
+          </div>
+          {/* Det er bygningen der kører her i browseren — ikke nødvendigvis den
+              der ligger på serveren. Service worker'en spørger før den skifter. */}
+          <span className="lede">{t("profile.versionHint")}</span>
+        </section>
+
+        <hr className="rule" />
 
         <button
           className="btn btn-danger btn-block"

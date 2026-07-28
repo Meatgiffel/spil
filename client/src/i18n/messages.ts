@@ -221,6 +221,11 @@ export const en = {
   "profile.administration": "Administration",
   "profile.inviteKeys": "Invite keys",
   "profile.language": "Language",
+  "profile.version": "Version",
+  "profile.built": "Built {date} at {time}",
+  "profile.builtUnknown": "Development build",
+  "profile.versionHint":
+    "This is the version running on this device. Reload when a new one is offered to update it.",
   "profile.signOut": "Sign out",
   "profile.queuedTitle": "There are changes waiting to be sent",
   "profile.queuedBody":
@@ -554,6 +559,11 @@ export const da: Record<MessageKey, string> = {
   "profile.administration": "Administration",
   "profile.inviteKeys": "Invitationsnøgler",
   "profile.language": "Sprog",
+  "profile.version": "Version",
+  "profile.built": "Bygget {date} kl. {time}",
+  "profile.builtUnknown": "Udviklingsbygning",
+  "profile.versionHint":
+    "Det er den version der kører på denne enhed. Genindlæs når en ny bliver tilbudt, for at opdatere den.",
   "profile.signOut": "Log ud",
   "profile.queuedTitle": "Der ligger ændringer i kø",
   "profile.queuedBody":
